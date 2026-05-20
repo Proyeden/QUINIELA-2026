@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -154,6 +155,21 @@ body{font-family:'DM Sans',sans-serif;background:var(--light);color:var(--text);
 .empty-icon{font-size:3rem;display:block;margin-bottom:.75rem;opacity:.6}
 .empty-state p{font-size:14px;line-height:1.7}
 
+
+.admin-lock,.control-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:1rem;box-shadow:var(--shadow)}
+.admin-lock-title,.control-title{font-size:14px;font-weight:800;color:var(--navy);margin-bottom:.35rem}
+.admin-lock-desc,.control-desc{font-size:12px;color:#777;line-height:1.6;margin-bottom:.8rem}
+.admin-pin-row{display:flex;gap:8px}
+.admin-pin-input{flex:1;padding:11px 14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:15px;font-family:'DM Sans',sans-serif;background:#fafaf7}
+.admin-pin-input:focus{outline:none;border-color:var(--navy3);background:#fff;box-shadow:0 0 0 3px rgba(15,52,96,.1)}
+.admin-state{font-size:11px;font-weight:700;margin-top:.6rem;color:var(--muted)}
+.ctrl-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:.85rem}
+.ctrl-badge{font-size:11px;font-weight:800;border-radius:99px;padding:5px 12px;background:#fff3cd;color:#8a5a00}
+.ctrl-badge.on{background:#e7f8ee;color:#176b3a}
+.toggle-btn{padding:11px 14px;background:var(--navy3);color:#fff;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:800;cursor:pointer;font-family:inherit}
+.toggle-btn:hover{background:var(--red)}
+.private-note{background:#eef4ff;border:1px solid #bfd4ff;border-radius:var(--radius-sm);padding:12px 14px;font-size:13px;color:#173b70;line-height:1.55;margin-bottom:1rem}
+
 /* ── RESPONSIVE ── */
 @media(max-width:380px){
   .team-name{font-size:11px}
@@ -242,12 +258,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--light);color:var(--text);
 <!-- ══════════════════ PAGE: ADMIN ══════════════════ -->
 <div class="page" id="page-admin">
   <div class="wrap">
+    <div id="admin-gate"></div>
+    <div id="admin-controls" style="display:none"></div>
     <div id="admin-list"></div>
     <div class="export-card" id="export-card" style="display:none">
       <div class="export-title">Exportar al Excel</div>
       <div class="export-desc">
         Copia los datos y pégalos en la hoja <strong>📝 Pronósticos</strong> del archivo Excel.<br>
-        Selecciona primero la celda <strong>E4</strong> (primera celda de pronósticos).
+        Selecciona la primera celda del área de pronósticos, por ejemplo <strong>E4</strong>.
       </div>
       <button class="exp-btn" onclick="copyForExcel()">📋 Copiar datos para Excel</button>
       <button class="exp-btn sec" onclick="downloadCSV()">⬇ Descargar como CSV</button>
@@ -255,9 +273,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--light);color:var(--text);
         <b>Cómo pegar en Excel paso a paso:</b>
         1. Abre el archivo <em>Quiniela_FaseGrupos2026.xlsx</em><br>
         2. Ve a la hoja <em>📝 Pronósticos</em><br>
-        3. Haz clic en la celda <strong>E4</strong><br>
+        3. Haz clic en la primera celda del área de participantes, por ejemplo <strong>E4</strong><br>
         4. Pega con <strong>Ctrl+V</strong> (Windows) o <strong>Cmd+V</strong> (Mac)<br>
-        Los nombres y goles se distribuyen solos. Los puntos y el ranking se actualizan automáticamente.
+        Los nombres quedarán en columnas y los marcadores bajarán por partido.
       </div>
     </div>
     <div style="text-align:center;margin-top:2rem">
@@ -341,7 +359,9 @@ for (const grp of 'ABCDEFGHIJKL') {
 }
 
 // ── CONFIG ──
-const LOCKED = false; // → true cuando empiece el torneo
+const LOCKED = false; // → true cuando empiece el torneo y ya no quieras recibir pronósticos
+const ADMIN_PIN = "20262026"; // Cambia esta clave antes de compartir el enlace
+const DEFAULT_SHOW_PUBLIC_PICKS = false; // false = ocultar pronósticos antes del torneo
 
 // 🔥 FIREBASE CONFIG
 // 1) Crea tu proyecto en Firebase
@@ -360,6 +380,8 @@ const firebaseConfig = {
 const FIREBASE_READY = firebaseConfig.apiKey && !firebaseConfig.apiKey.includes('PEGA_AQUI');
 let db = null;
 const COLLECTION = 'quiniela_mundial_2026';
+const SETTINGS_COLLECTION = 'quiniela_config';
+const SETTINGS_DOC = 'control';
 
 if (FIREBASE_READY) {
   firebase.initializeApp(firebaseConfig);
@@ -374,7 +396,7 @@ const AV_COLORS = [
 ];
 
 // ── STATE ──
-let parts = [], me = null;
+let parts = [], me = null, isAdmin = sessionStorage.getItem("qm26_admin") === "1", showPublicPicks = DEFAULT_SHOW_PUBLIC_PICKS;
 
 function docIdFromName(name) {
   return name
@@ -394,6 +416,13 @@ function load() {
     toast('Modo local: falta configurar Firebase');
     return;
   }
+
+  db.collection(SETTINGS_COLLECTION).doc(SETTINGS_DOC).onSnapshot(doc => {
+    showPublicPicks = doc.exists ? !!doc.data().showPublicPicks : DEFAULT_SHOW_PUBLIC_PICKS;
+    const activePage = document.querySelector('.page.active')?.id || '';
+    if (activePage === 'page-ranking') buildRanking();
+    if (activePage === 'page-admin') buildAdmin();
+  }, err => console.warn('No se pudo leer configuración', err));
 
   db.collection(COLLECTION).orderBy('ts', 'desc').onSnapshot(snapshot => {
     parts = snapshot.docs.map(doc => ({ _id: doc.id, ...doc.data() }));
@@ -435,7 +464,7 @@ function goPage(p) {
   document.getElementById('submit-bar').style.display =
     (p === 'form' && !LOCKED && me) ? 'block' : 'none';
   if (p === 'ranking') buildRanking();
-  if (p === 'admin') buildAdmin();
+  if (p === 'admin') { renderAdminGate(); buildAdmin(); }
 }
 
 // ── FORM ──
@@ -570,49 +599,162 @@ function buildRanking() {
     el.innerHTML = `<div class="empty-state"><span class="empty-icon">📋</span><p>Aún no hay pronósticos.<br>Comparte el link con tus participantes.</p></div>`;
     return;
   }
+
   const sorted = [...parts].sort((a, b) => b.filled - a.filled || a.name.localeCompare(b.name));
   const medals = ['🥇','🥈','🥉'];
 
-  el.innerHTML = sorted.map((p, i) => {
+  const privacyMsg = showPublicPicks ? '' : `
+    <div class="private-note">
+      🔒 Los pronósticos están ocultos temporalmente para evitar copia entre participantes. 
+      Cuando el administrador active la vista pública, aquí se podrán revisar los marcadores.
+    </div>`;
+
+  el.innerHTML = privacyMsg + sorted.map((p, i) => {
     const av = AV_COLORS[i % AV_COLORS.length];
     const ini = p.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
     const pct = Math.round(p.filled / 72 * 100);
-    const rows = p.picks.map(pk => {
+
+    const rows = showPublicPicks ? p.picks.map(pk => {
       const m = MATCHES.find(x => x.id === pk.id);
       const has = pk.gl !== '' && pk.gv !== '';
       return `<div class="pick-row">
         <span class="pick-game">${m.lf} ${m.local} vs ${m.visita} ${m.vf}</span>
         <span class="pick-score${has ? '' : ' empty'}">${has ? pk.gl + ' – ' + pk.gv : '–'}</span>
       </div>`;
-    }).join('');
+    }).join('') : '';
+
+    const clickAttr = showPublicPicks ? `onclick="toggleRank('r${i}')"` : '';
+    const chev = showPublicPicks ? `<span class="chev" id="ch-r${i}">▼</span>` : `<span class="chev">🔒</span>`;
+    const body = showPublicPicks ? `<div class="rank-body" id="rb-r${i}">${rows}</div>` : '';
 
     return `<div class="rank-card">
-      <div class="rank-head" onclick="toggleRank('r${i}')">
+      <div class="rank-head" ${clickAttr}>
         <div class="rank-left">
           <div style="font-size:20px;width:28px;text-align:center;flex-shrink:0">${medals[i] || '#' + (i + 1)}</div>
           <div class="avatar" style="background:${av.bg};color:${av.c}">${ini}</div>
           <div>
             <div class="rank-name">${p.name}</div>
-            <div class="rank-sub">${p.filled}/72 partidos</div>
+            <div class="rank-sub">${p.filled}/72 partidos registrados</div>
           </div>
         </div>
         <div class="rank-right">
           <span class="pct-txt">${pct}%</span>
-          <span class="chev" id="ch-r${i}">▼</span>
+          ${chev}
         </div>
       </div>
       <div class="prog-mini">
         <div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${pct}%"></div></div>
       </div>
-      <div class="rank-body" id="rb-r${i}">${rows}</div>
+      ${body}
     </div>`;
   }).join('');
 }
 
 // ── ADMIN ──
+function renderAdminGate() {
+  const gate = document.getElementById('admin-gate');
+  const controls = document.getElementById('admin-controls');
+  if (!gate || !controls) return;
+
+  if (isAdmin) {
+    gate.innerHTML = '';
+    controls.style.display = 'block';
+    return;
+  }
+
+  controls.style.display = 'none';
+  gate.innerHTML = `
+    <div class="admin-lock">
+      <div class="admin-lock-title">🔐 Panel de administrador</div>
+      <div class="admin-lock-desc">
+        Ingresa la clave de administrador para borrar participantes, exportar a Excel y activar la vista pública de pronósticos.
+      </div>
+      <div class="admin-pin-row">
+        <input class="admin-pin-input" id="admin-pin" type="password" placeholder="Clave de administrador" onkeydown="if(event.key==='Enter') adminLogin()">
+        <button class="go-btn" onclick="adminLogin()">Entrar</button>
+      </div>
+      <div class="admin-state">Los participantes no necesitan esta clave para llenar su quiniela.</div>
+    </div>`;
+}
+
+function adminLogin() {
+  const pin = document.getElementById('admin-pin')?.value || '';
+  if (pin !== ADMIN_PIN) {
+    toast('Clave incorrecta');
+    return;
+  }
+  isAdmin = true;
+  sessionStorage.setItem('qm26_admin', '1');
+  renderAdminGate();
+  buildAdmin();
+  toast('Modo administrador activado');
+}
+
+function adminLogout() {
+  isAdmin = false;
+  sessionStorage.removeItem('qm26_admin');
+  renderAdminGate();
+  buildAdmin();
+  toast('Sesión de administrador cerrada');
+}
+
+async function setPublicPicks(value) {
+  if (!isAdmin) return toast('Solo el administrador puede cambiar esto');
+  if (!db) {
+    showPublicPicks = value;
+    buildAdmin();
+    buildRanking();
+    return;
+  }
+  try {
+    await db.collection(SETTINGS_COLLECTION).doc(SETTINGS_DOC).set({
+      showPublicPicks: value,
+      updatedAt: Date.now()
+    }, { merge: true });
+    toast(value ? 'Pronósticos visibles para todos' : 'Pronósticos ocultos para participantes');
+  } catch (err) {
+    console.error(err);
+    toast('No se pudo cambiar la configuración');
+  }
+}
+
+function buildAdminControls() {
+  const controls = document.getElementById('admin-controls');
+  if (!controls) return;
+  controls.innerHTML = `
+    <div class="control-card">
+      <div class="control-title">Configuración de visibilidad</div>
+      <div class="control-desc">
+        Antes del torneo conviene mantener ocultos los marcadores para evitar copia. 
+        Al iniciar el campeonato puedes activar la vista pública.
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-badge ${showPublicPicks ? 'on' : ''}">
+          ${showPublicPicks ? 'Pronósticos visibles' : 'Pronósticos ocultos'}
+        </span>
+        <button class="toggle-btn" onclick="setPublicPicks(${showPublicPicks ? 'false' : 'true'})">
+          ${showPublicPicks ? 'Ocultar pronósticos' : 'Mostrar pronósticos'}
+        </button>
+      </div>
+      <div style="text-align:right;margin-top:.7rem">
+        <button onclick="adminLogout()" style="border:none;background:none;color:#aaa;font-size:11px;cursor:pointer;font-family:inherit">Cerrar modo admin</button>
+      </div>
+    </div>`;
+}
+
 function buildAdmin() {
+  renderAdminGate();
   const el = document.getElementById('admin-list');
   const expEl = document.getElementById('export-card');
+
+  if (!isAdmin) {
+    el.innerHTML = '';
+    expEl.style.display = 'none';
+    return;
+  }
+
+  buildAdminControls();
+
   if (!parts.length) {
     el.innerHTML = `<div class="empty-state"><span class="empty-icon">⚙️</span><p>No hay pronósticos registrados.<br>Comparte el link para que los participantes llenen su quiniela.</p></div>`;
     expEl.style.display = 'none';
@@ -661,6 +803,7 @@ function toggleRank(id) {
   document.getElementById('ch-' + id).classList.toggle('open');
 }
 async function delPart(name) {
+  if (!isAdmin) return toast('Solo el administrador puede eliminar');
   if (!confirm(`¿Eliminar pronóstico de ${name}?`)) return;
 
   if (!db) {
@@ -679,6 +822,7 @@ async function delPart(name) {
 }
 
 async function clearAll() {
+  if (!isAdmin) return toast('Solo el administrador puede borrar todo');
   if (!confirm('¿Borrar TODOS los pronósticos? Esta acción no se puede deshacer.')) return;
 
   if (!db) {
@@ -700,47 +844,70 @@ async function clearAll() {
 
 // ── EXPORT ──
 function buildExcelTSV() {
-  // Filas: participantes. Columnas: GL y GV intercalados por partido.
-  // El admin pega esto en E4 de la hoja Pronósticos del Excel.
-  const lines = [];
-  parts.forEach(p => {
-    const cols = [p.name];
-    MATCHES.forEach(m => {
-      const pk = p.picks.find(x => x.id === m.id);
-      cols.push(pk && pk.gl !== '' ? pk.gl : '');
-      cols.push(pk && pk.gv !== '' ? pk.gv : '');
-    });
-    lines.push(cols.join('\t'));
+  // Formato corregido para Excel:
+  // Columnas = participantes; filas = partidos.
+  // Cada participante usa 2 columnas: goles local y goles visita.
+  // Al pegar desde E4, la primera fila contiene nombres y las siguientes filas contienen marcadores por partido.
+  const sorted = [...parts].sort((a, b) => a.name.localeCompare(b.name));
+
+  const header = [];
+  sorted.forEach(p => {
+    header.push(p.name);
+    header.push('');
   });
+
+  const lines = [header.join('\t')];
+
+  MATCHES.forEach(m => {
+    const row = [];
+    sorted.forEach(p => {
+      const pk = p.picks.find(x => x.id === m.id);
+      row.push(pk && pk.gl !== '' ? pk.gl : '');
+      row.push(pk && pk.gv !== '' ? pk.gv : '');
+    });
+    lines.push(row.join('\t'));
+  });
+
   return lines.join('\n');
 }
 
 function copyForExcel() {
+  if (!isAdmin) return toast('Solo el administrador puede exportar');
   const txt = buildExcelTSV();
   navigator.clipboard.writeText(txt)
-    .then(() => toast('¡Datos copiados! Selecciona E4 en Excel y pega con Ctrl+V'))
+    .then(() => toast('¡Datos copiados! Pega en la primera celda del área de participantes'))
     .catch(() => {
       const ta = document.createElement('textarea');
       ta.value = txt; document.body.appendChild(ta); ta.select();
       document.execCommand('copy'); document.body.removeChild(ta);
-      toast('¡Copiado! Pega en la celda E4 de la hoja Pronósticos');
+      toast('¡Copiado! Pega en la primera celda del área de participantes');
     });
 }
 
 function downloadCSV() {
-  const header = ['Participante', 'Completados', ...MATCHES.map(m => `${m.local} vs ${m.visita}`)];
-  const rows = [header];
-  parts.forEach(p => {
-    const scores = MATCHES.map(m => {
-      const pk = p.picks.find(x => x.id === m.id);
-      return (pk && pk.gl !== '' && pk.gv !== '') ? `${pk.gl}-${pk.gv}` : '';
-    });
-    rows.push([p.name, p.filled, ...scores]);
+  if (!isAdmin) return toast('Solo el administrador puede descargar CSV');
+  const sorted = [...parts].sort((a, b) => a.name.localeCompare(b.name));
+  const header = ['#', 'Local', 'Visita'];
+  sorted.forEach(p => {
+    header.push(`${p.name} Local`);
+    header.push(`${p.name} Visita`);
   });
+
+  const rows = [header];
+  MATCHES.forEach(m => {
+    const row = [m.id, m.local, m.visita];
+    sorted.forEach(p => {
+      const pk = p.picks.find(x => x.id === m.id);
+      row.push(pk && pk.gl !== '' ? pk.gl : '');
+      row.push(pk && pk.gv !== '' ? pk.gv : '');
+    });
+    rows.push(row);
+  });
+
   const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = 'quiniela_mundial2026.csv';
+  const a = document.createElement('a'); a.href = url; a.download = 'quiniela_mundial2026_columnas.csv';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
   toast('CSV descargado correctamente');
