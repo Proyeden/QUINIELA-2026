@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -170,6 +169,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--light);color:var(--text);
 .toggle-btn:hover{background:var(--red)}
 .private-note{background:#eef4ff;border:1px solid #bfd4ff;border-radius:var(--radius-sm);padding:12px 14px;font-size:13px;color:#173b70;line-height:1.55;margin-bottom:1rem}
 
+.export-select-box{background:#fafaf7;border:1px solid var(--border);border-radius:var(--radius-sm);padding:.85rem;margin:.85rem 0 1rem}
+.export-select-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:.65rem}
+.export-select-title{font-size:11px;font-weight:800;color:var(--navy);text-transform:uppercase;letter-spacing:.7px}
+.export-select-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.mini-btn{border:1px solid var(--border);background:#fff;color:var(--navy);border-radius:8px;padding:5px 9px;font-size:10px;font-weight:800;cursor:pointer;font-family:inherit}
+.mini-btn:hover{background:var(--light)}
+.export-checks{display:grid;grid-template-columns:1fr;gap:6px;max-height:170px;overflow:auto;padding-right:2px}
+.export-check{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #eee;border-radius:8px;padding:8px 9px;font-size:12px;font-weight:700;color:var(--text);cursor:pointer}
+.export-check input{width:16px;height:16px;accent-color:var(--navy3);flex-shrink:0}
+.export-help{font-size:11px;color:#777;line-height:1.5;margin-top:.6rem}
+
 /* ── RESPONSIVE ── */
 @media(max-width:380px){
   .team-name{font-size:11px}
@@ -264,11 +274,22 @@ body{font-family:'DM Sans',sans-serif;background:var(--light);color:var(--text);
     <div class="export-card" id="export-card" style="display:none">
       <div class="export-title">Exportar al Excel</div>
       <div class="export-desc">
-        Copia los datos y pégalos en la hoja <strong>📝 Pronósticos</strong> del archivo Excel.<br>
-        Selecciona la primera celda del área de pronósticos, por ejemplo <strong>E4</strong>.
+        Selecciona uno o varios participantes y copia solo esos pronósticos.<br>
+        Si tienes un participante de última hora, puedes copiar únicamente ese registro.
       </div>
-      <button class="exp-btn" onclick="copyForExcel()">📋 Copiar datos para Excel</button>
-      <button class="exp-btn sec" onclick="downloadCSV()">⬇ Descargar como CSV</button>
+      <div class="export-select-box">
+        <div class="export-select-head">
+          <div class="export-select-title">Pronósticos a copiar</div>
+          <div class="export-select-actions">
+            <button class="mini-btn" onclick="selectAllExportParticipants(true)">Todos</button>
+            <button class="mini-btn" onclick="selectAllExportParticipants(false)">Limpiar</button>
+          </div>
+        </div>
+        <div id="export-select-list" class="export-checks"></div>
+        <div class="export-help" id="export-selected-help">Selecciona al menos un participante para copiarlo a Excel.</div>
+      </div>
+      <button class="exp-btn" onclick="copyForExcel()">📋 Copiar seleccionados para Excel</button>
+      <button class="exp-btn sec" onclick="downloadCSV()">⬇ Descargar seleccionados como CSV</button>
       <div class="how-to">
         <b>Cómo pegar en Excel paso a paso:</b>
         1. Abre el archivo <em>Quiniela_FaseGrupos2026.xlsx</em><br>
@@ -360,7 +381,7 @@ for (const grp of 'ABCDEFGHIJKL') {
 
 // ── CONFIG ──
 const LOCKED = false; // → true cuando empiece el torneo y ya no quieras recibir pronósticos
-const ADMIN_PIN = "20262026"; // Cambia esta clave antes de compartir el enlace
+const ADMIN_PIN = "2026"; // Cambia esta clave antes de compartir el enlace
 const DEFAULT_SHOW_PUBLIC_PICKS = false; // false = ocultar pronósticos antes del torneo
 
 // 🔥 FIREBASE CONFIG
@@ -397,6 +418,7 @@ const AV_COLORS = [
 
 // ── STATE ──
 let parts = [], me = null, isAdmin = sessionStorage.getItem("qm26_admin") === "1", showPublicPicks = DEFAULT_SHOW_PUBLIC_PICKS;
+let selectedExportIds = new Set();
 
 function docIdFromName(name) {
   return name
@@ -718,6 +740,77 @@ async function setPublicPicks(value) {
   }
 }
 
+
+function safeHtml(text) {
+  return String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function exportIdForParticipant(p) {
+  return p._id || docIdFromName(p.name);
+}
+
+function buildExportSelector(sorted) {
+  const box = document.getElementById('export-select-list');
+  if (!box) return;
+
+  const validIds = new Set(sorted.map(exportIdForParticipant));
+  selectedExportIds = new Set([...selectedExportIds].filter(id => validIds.has(id)));
+
+  // Si aún no se ha seleccionado nada, marcamos todos por comodidad.
+  if (selectedExportIds.size === 0 && sorted.length) {
+    sorted.forEach(p => selectedExportIds.add(exportIdForParticipant(p)));
+  }
+
+  box.innerHTML = sorted.map(p => {
+    const id = exportIdForParticipant(p);
+    const checked = selectedExportIds.has(id) ? 'checked' : '';
+    return `
+      <label class="export-check">
+        <input type="checkbox" data-export-id="${safeHtml(id)}" ${checked} onchange="toggleExportSelection('${safeHtml(id)}', this.checked)">
+        <span>${safeHtml(p.name)} · ${p.filled}/72</span>
+      </label>`;
+  }).join('');
+
+  syncExportSelectionUI();
+}
+
+function toggleExportSelection(id, checked) {
+  if (checked) selectedExportIds.add(id);
+  else selectedExportIds.delete(id);
+  syncExportSelectionUI();
+}
+
+function selectAllExportParticipants(value) {
+  const checks = document.querySelectorAll('#export-select-list input[type="checkbox"]');
+  checks.forEach(ch => {
+    ch.checked = value;
+    const id = ch.getAttribute('data-export-id');
+    if (value) selectedExportIds.add(id);
+    else selectedExportIds.delete(id);
+  });
+  syncExportSelectionUI();
+}
+
+function syncExportSelectionUI() {
+  const help = document.getElementById('export-selected-help');
+  if (!help) return;
+  const n = selectedExportIds.size;
+  help.textContent = n === 0
+    ? 'Selecciona al menos un participante para copiarlo a Excel.'
+    : `${n} participante${n === 1 ? '' : 's'} seleccionado${n === 1 ? '' : 's'} para exportar.`;
+}
+
+function getSelectedExportParticipants() {
+  const sorted = [...parts].sort((a, b) => a.name.localeCompare(b.name));
+  const selected = sorted.filter(p => selectedExportIds.has(exportIdForParticipant(p)));
+  return selected;
+}
+
 function buildAdminControls() {
   const controls = document.getElementById('admin-controls');
   if (!controls) return;
@@ -762,6 +855,7 @@ function buildAdmin() {
   }
   expEl.style.display = 'block';
   const sorted = [...parts].sort((a, b) => b.filled - a.filled);
+  buildExportSelector(sorted);
 
   el.innerHTML = sorted.map((p, i) => {
     const av = AV_COLORS[i % AV_COLORS.length];
@@ -843,15 +937,15 @@ async function clearAll() {
 }
 
 // ── EXPORT ──
-function buildExcelTSV() {
-  // Formato corregido para Excel:
-  // Columnas = participantes; filas = partidos.
+function buildExcelTSV(selectedParts = null) {
+  // Formato para Excel:
+  // Columnas = participantes seleccionados; filas = partidos.
   // Cada participante usa 2 columnas: goles local y goles visita.
-  // Al pegar desde E4, la primera fila contiene nombres y las siguientes filas contienen marcadores por partido.
-  const sorted = [...parts].sort((a, b) => a.name.localeCompare(b.name));
+  const selected = selectedParts || getSelectedExportParticipants();
+  if (!selected.length) return '';
 
   const header = [];
-  sorted.forEach(p => {
+  selected.forEach(p => {
     header.push(p.name);
     header.push('');
   });
@@ -860,7 +954,7 @@ function buildExcelTSV() {
 
   MATCHES.forEach(m => {
     const row = [];
-    sorted.forEach(p => {
+    selected.forEach(p => {
       const pk = p.picks.find(x => x.id === m.id);
       row.push(pk && pk.gl !== '' ? pk.gl : '');
       row.push(pk && pk.gv !== '' ? pk.gv : '');
@@ -873,20 +967,24 @@ function buildExcelTSV() {
 
 function copyForExcel() {
   if (!isAdmin) return toast('Solo el administrador puede exportar');
-  const txt = buildExcelTSV();
+  const selected = getSelectedExportParticipants();
+  if (!selected.length) return toast('Selecciona al menos un participante');
+  const txt = buildExcelTSV(selected);
   navigator.clipboard.writeText(txt)
-    .then(() => toast('¡Datos copiados! Pega en la primera celda del área de participantes'))
+    .then(() => toast(`¡Copiado! ${selected.length} participante${selected.length === 1 ? '' : 's'} seleccionado${selected.length === 1 ? '' : 's'}`))
     .catch(() => {
       const ta = document.createElement('textarea');
       ta.value = txt; document.body.appendChild(ta); ta.select();
       document.execCommand('copy'); document.body.removeChild(ta);
-      toast('¡Copiado! Pega en la primera celda del área de participantes');
+      toast(`¡Copiado! ${selected.length} participante${selected.length === 1 ? '' : 's'} seleccionado${selected.length === 1 ? '' : 's'}`);
     });
 }
 
 function downloadCSV() {
   if (!isAdmin) return toast('Solo el administrador puede descargar CSV');
-  const sorted = [...parts].sort((a, b) => a.name.localeCompare(b.name));
+  const sorted = getSelectedExportParticipants();
+  if (!sorted.length) return toast('Selecciona al menos un participante');
+
   const header = ['#', 'Local', 'Visita'];
   sorted.forEach(p => {
     header.push(`${p.name} Local`);
@@ -907,10 +1005,10 @@ function downloadCSV() {
   const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = 'quiniela_mundial2026_columnas.csv';
+  const a = document.createElement('a'); a.href = url; a.download = 'quiniela_mundial2026_seleccionados.csv';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  toast('CSV descargado correctamente');
+  toast(`CSV descargado: ${sorted.length} participante${sorted.length === 1 ? '' : 's'}`);
 }
 
 // ── TOAST ──
