@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#1A1A2E">
 <meta name="description" content="Quiniela Mundialista 2026 — Fase de Grupos. Llena tu pronóstico para los 72 partidos.">
 <title>⚽ Quiniela Mundial 2026</title>
+<link rel="manifest" id="pwa-manifest">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -575,6 +576,17 @@ for (const grp of 'ABCDEFGHIJKL') {
   });
 }
 
+
+// Mapeo fecha → Date 2026 (construido automáticamente desde MATCHES)
+const DATE_MAP = {};
+(function(){
+  const months = { 'jun':5, 'jul':6 };
+  [...new Set(MATCHES.map(m => m.date))].forEach(ds => {
+    const [d, mon] = ds.split(' ');
+    DATE_MAP[ds] = new Date(2026, months[mon] ?? 5, parseInt(d));
+  });
+})();
+
 // ── CONFIG ──
 const LOCKED = false; // → true cuando empiece el torneo y ya no quieras recibir pronósticos
 const ADMIN_PIN = "20262026"; // Cambia esta clave antes de compartir el enlace
@@ -682,7 +694,7 @@ function goPage(p) {
     el.classList.toggle('active', ['form','ranking','admin'][i] === p)
   );
   document.getElementById('submit-bar').style.display =
-    (p === 'form' && !LOCKED && me) ? 'block' : 'none';
+    (p === 'form' && !LOCKED && me && editModeActive) ? 'block' : 'none';
   if (p === 'ranking') buildRanking();
   if (p === 'admin') { renderAdminGate(); buildAdmin(); }
 }
@@ -791,8 +803,13 @@ function refreshProgress() {
   const pct = Math.round(filled / 72 * 100);
   document.getElementById('prog-fill').style.width = pct + '%';
   const lbl = document.getElementById('prog-lbl');
-  lbl.innerHTML = `<span>${filled} / 72 partidos pronósticados</span><span>${pct}%</span>`;
+  const pending2 = 72 - filled;
+  const pendTag = pending2 > 0
+    ? `<span style="color:var(--red);font-weight:700">${pending2} pendientes</span>`
+    : `<span style="color:var(--green);font-weight:700">✓ Completo</span>`;
+  lbl.innerHTML = `<span>${filled} / 72 pronosticados</span>${pendTag}`;
   lbl.className = 'prog-label' + (filled === 72 ? ' done' : '');
+  hasUnsavedChanges = true;
 }
 
 async function saveQuiniela() {
@@ -813,9 +830,16 @@ async function saveQuiniela() {
     return;
   }
 
+  const btn = document.querySelector('.submit-btn');
+  if (btn) { btn.classList.add('saving'); btn.textContent = 'Guardando…'; btn.disabled = true; }
   try {
     await db.collection(COLLECTION).doc(docIdFromName(me)).set(entry);
     hasUnsavedChanges = false;
+    if (btn) {
+      btn.classList.remove('saving'); btn.classList.add('saved');
+      btn.textContent = 'Guardado ✓';
+      setTimeout(() => { btn.classList.remove('saved'); btn.textContent = 'Guardar mi quiniela ✓'; btn.disabled = false; }, 2200);
+    }
     toast(`✓ Guardado — ${filled}/72 partidos`);
     setTimeout(() => {
       editModeActive = false;
@@ -827,6 +851,7 @@ async function saveQuiniela() {
     }, 2300);
   } catch (err) {
     console.error(err);
+    if (btn) { btn.classList.remove('saving'); btn.textContent = 'Guardar mi quiniela ✓'; btn.disabled = false; }
     toast('No se pudo guardar');
   }
 }
