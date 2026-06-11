@@ -1315,9 +1315,7 @@ function buildUpcoming() {
     const showPicksBtn = showPublicPicks
       ? `Ver pronósticos <span class="upcoming-chevron" id="uchev-${m.id}">▼</span>`
       : `<span style="color:var(--muted)">🔒 Pronósticos ocultos</span>`;
-    const simBtnHtml = me
-      ? `<span class="upcoming-expand-hint" style="color:var(--gold)" onclick="event.stopPropagation();toggleSimulator(${m.id})">🧮 Simular puntos <span class="upcoming-chevron" id="simchev-${m.id}">▼</span></span>`
-      : `<span style="font-size:10px;color:var(--muted)">Ingresa tu nombre para simular</span>`;
+    const simBtnHtml = `<span class="upcoming-expand-hint" style="color:var(--gold)" onclick="event.stopPropagation();toggleSimulator(${m.id})">🧮 Simular puntos <span class="upcoming-chevron" id="simchev-${m.id}">▼</span></span>`;
 
     html += `<div class="upcoming-card" style="border-left:3px solid ${gd.c}">
       <div class="upcoming-top" style="background:${gd.c}">
@@ -1382,13 +1380,19 @@ function buildSimulatorInner(m) {
   </div>
   <div class="sim-input-row">
     <span class="sim-label">${m.lf} ${m.local}</span>
-    <input class="sim-score-box" type="number" id="simgl-${m.id}" min="0" max="20" placeholder="–" inputmode="decimal" pattern="[0-9]*">
+    <input class="sim-score-box" type="number" id="simgl-${m.id}" min="0" max="20" placeholder="–"
+      inputmode="decimal" pattern="[0-9]*" oninput="onSimInput(${m.id})">
     <span class="sim-dash">–</span>
-    <input class="sim-score-box" type="number" id="simgv-${m.id}" min="0" max="20" placeholder="–" inputmode="decimal" pattern="[0-9]*">
+    <input class="sim-score-box" type="number" id="simgv-${m.id}" min="0" max="20" placeholder="–"
+      inputmode="decimal" pattern="[0-9]*" oninput="onSimInput(${m.id})">
     <span class="sim-label">${m.visita} ${m.vf}</span>
-    <button class="sim-btn" onclick="runSimulation(${m.id})">Calcular</button>
   </div>
-  <div class="sim-results" id="simresults-${m.id}"></div>`;
+  <div style="padding:4px 12px 8px;text-align:center;font-size:10px;color:#92400e;background:#fff8e8;border-bottom:1px solid #fde68a">
+    Los puntos se calculan automáticamente al ingresar el marcador
+  </div>
+  <div class="sim-results" id="simresults-${m.id}">
+    <div class="sim-no-picks">Ingresa el marcador hipotético para calcular</div>
+  </div>`;
 }
 
 function toggleSimulator(matchId) {
@@ -1401,11 +1405,18 @@ function toggleSimulator(matchId) {
   if (chev) chev.classList.toggle('open',!isOpen);
 }
 
+function onSimInput(matchId) {
+  const gl = document.getElementById('simgl-'+matchId)?.value;
+  const gv = document.getElementById('simgv-'+matchId)?.value;
+  if (gl !== '' && gl !== undefined && gv !== '' && gv !== undefined) {
+    runSimulation(matchId);
+  }
+}
+
 function runSimulation(matchId) {
-  if (!me) return toast('Ingresa tu nombre primero');
   const gl=document.getElementById('simgl-'+matchId)?.value;
   const gv=document.getElementById('simgv-'+matchId)?.value;
-  if (gl===''||gv==='') return toast('Ingresa el resultado simulado');
+  if (!gl || !gv || gl==='' || gv==='') { document.getElementById('simresults-'+matchId).innerHTML='<div class="sim-no-picks">Ingresa ambos goles para calcular</div>'; return; }
   const resultsContainer=document.getElementById('simresults-'+matchId);
   if (!resultsContainer) return;
   // FIX 8: const m BEFORE html construction
@@ -1413,7 +1424,7 @@ function runSimulation(matchId) {
   const simParticipants=parts.filter(p=>{const pk=(p.picks||[]).find(x=>x.id===matchId);return pk&&pk.gl!==''&&pk.gv!=='';})
     .map(p=>{const pk=(p.picks||[]).find(x=>x.id===matchId);const pts=calcPoints(pk.gl,pk.gv,gl,gv);return{...p,simPts:pts,pickGl:pk.gl,pickGv:pk.gv};});
   if (!simParticipants.length){resultsContainer.innerHTML='<div class="sim-no-picks">Ningún participante tiene pronóstico para este partido.</div>';return;}
-  simParticipants.sort((a,b)=>b.simPts-a.simPts);
+  simParticipants.sort((a,b)=>(b.simPts??-1)-(a.simPts??-1));
   const gainClass=pts=>pts===50?'gain-50':pts===30?'gain-30':pts===20?'gain-20':pts===10?'gain-10':'gain-0';
   const gainLabel=pts=>pts===50?'⭐⭐⭐⭐ +50':pts===30?'⭐⭐⭐ +30':pts===20?'⭐⭐ +20':pts===10?'⭐ +10':'✕ +0';
   let html=`<div class="sim-results-header">
@@ -1421,7 +1432,7 @@ function runSimulation(matchId) {
     <span class="sim-results-hint">Solo tú ves esto</span>
   </div>`;
   simParticipants.forEach((p,i)=>{
-    const isMe=p.name.toLowerCase()===me.toLowerCase();
+    const isMe=me&&p.name.toLowerCase()===me.toLowerCase();
     const av=AV_COLORS[i%AV_COLORS.length];
     const ini=p.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
     html+=`<div class="sim-row${isMe?' me-row':''}">
