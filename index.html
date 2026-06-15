@@ -626,6 +626,35 @@ const DATE_MAP = {};
   });
 })();
 
+
+// ═══════════════════════════════════════════════════
+//  AUTO-SYNC DE RESULTADOS — football-data.org (gratis)
+//  Registro en: https://www.football-data.org/client/register
+//  Pega tu API key abajo (es gratuita)
+// ═══════════════════════════════════════════════════
+const FOOTBALL_API_KEY = "6ea2ec943855488488a516c97b15b053";
+
+// Mapeo: nombres en español → nombres en inglés de la API
+const TEAM_MAP = {
+  "México":"Mexico","Sudáfrica":"South Africa","Corea del Sur":"Korea Republic",
+  "Chequia":"Czechia","Canadá":"Canada","Bosnia y Herzegovina":"Bosnia and Herzegovina",
+  "Qatar":"Qatar","Suiza":"Switzerland","Brasil":"Brazil","Marruecos":"Morocco",
+  "Haití":"Haiti","Escocia":"Scotland","Estados Unidos":"USA",
+  "Paraguay":"Paraguay","Australia":"Australia","Turquía":"Turkey",
+  "Alemania":"Germany","Curazao":"Curaçao","Costa de Marfil":"Ivory Coast",
+  "Ecuador":"Ecuador","Países Bajos":"Netherlands","Japón":"Japan",
+  "Suecia":"Sweden","Túnez":"Tunisia","Bélgica":"Belgium","Egipto":"Egypt",
+  "Irán":"Iran","Nueva Zelanda":"New Zealand","España":"Spain",
+  "Cabo Verde":"Cape Verde","Arabia Saudita":"Saudi Arabia","Uruguay":"Uruguay",
+  "Francia":"France","Senegal":"Senegal","Noruega":"Norway","Iraq":"Iraq",
+  "Argentina":"Argentina","Argelia":"Algeria","Austria":"Austria",
+  "Jordania":"Jordan","Portugal":"Portugal","DR Congo":"Congo DR",
+  "Uzbekistán":"Uzbekistan","Colombia":"Colombia","Inglaterra":"England",
+  "Croacia":"Croatia","Ghana":"Ghana","Panamá":"Panama",
+};
+
+let lastSync = null;
+
 // ── CONFIG ──
 const LOCKED = false; // → true cuando empiece el torneo y ya no quieras recibir pronósticos
 const ADMIN_PIN = "20262026"; // Cambia esta clave antes de compartir el enlace
@@ -666,6 +695,7 @@ const AV_COLORS = [
 // ── STATE ──
 let parts = [], me = null, isAdmin = sessionStorage.getItem("qm26_admin") === "1", showPublicPicks = DEFAULT_SHOW_PUBLIC_PICKS;
 let selectedExportIds = new Set();
+let realResults = {}; // {matchId: {gl, gv, final}} resultados reales
 
 function docIdFromName(name) {
   return name
@@ -690,6 +720,20 @@ function load() {
     if (doc.exists) {
       showPublicPicks = !!doc.data().showPublicPicks;
       realResults = doc.data().realResults || {};
+      const live = doc.data().liveMatches || 0;
+      // Actualizar badge EN VIVO en el tab de Participantes
+      const liveTab = document.querySelector('.tab:nth-child(2)');
+      if (liveTab) {
+        const existing = liveTab.querySelector('.live-tab-dot');
+        if (live > 0 && !existing) {
+          const dot = document.createElement('span');
+          dot.className = 'live-tab-dot';
+          dot.style.cssText = 'display:inline-block;width:7px;height:7px;background:var(--red);border-radius:50%;margin-left:5px;animation:blink 1.4s infinite;vertical-align:middle';
+          liveTab.appendChild(dot);
+        } else if (live === 0 && existing) {
+          existing.remove();
+        }
+      }
     } else {
       showPublicPicks = DEFAULT_SHOW_PUBLIC_PICKS;
       realResults = {};
@@ -759,12 +803,13 @@ function startForm() {
   document.getElementById('locked-msg').style.display = 'none';
   document.getElementById('prog-wrap').style.display = 'block';
 
-  renderGames(); prefill(); refreshProgress();
   buildUpcoming();
 
   const existing = parts.find(p => p.name.toLowerCase() === n.toLowerCase());
   if (existing && existing.filled > 0) {
+    // Participante existente → solo lectura, sin tocar hasUnsavedChanges
     editModeActive = false;
+    document.getElementById('prog-wrap').style.display = 'none';
     document.getElementById('games-wrap').style.display = 'none';
     document.getElementById('submit-bar').style.display = 'none';
     buildMyPicks(false);
@@ -772,8 +817,12 @@ function startForm() {
     if (btn) { btn.textContent = 'Ver mis pronósticos'; btn.style.background = 'var(--green)'; }
     setTimeout(() => document.getElementById('mypicks-wrap').scrollIntoView({behavior:'smooth',block:'start'}), 120);
   } else {
+    // Participante nuevo → modo edición completo
     editModeActive = true;
+    document.getElementById('prog-wrap').style.display = 'block';
     document.getElementById('mypicks-wrap').style.display = 'none';
+    renderGames(); prefill(); refreshProgress();
+    hasUnsavedChanges = false; // prefill no es "cambio"
     document.getElementById('games-wrap').style.display = 'block';
     document.getElementById('submit-bar').style.display = 'block';
     setTimeout(() => document.getElementById('games-wrap').scrollIntoView({behavior:'smooth',block:'start'}), 120);
@@ -825,6 +874,7 @@ function onScore(id) {
   const gv = document.getElementById('gv-' + id);
   gl.classList.toggle('has-v', gl.value !== '');
   gv.classList.toggle('has-v', gv.value !== '');
+  hasUnsavedChanges = true; // usuario realmente escribió algo
   refreshProgress();
 }
 
@@ -854,7 +904,7 @@ function refreshProgress() {
     : `<span style="color:var(--green);font-weight:700">✓ Completo</span>`;
   lbl.innerHTML = `<span>${filled} / 72 pronosticados</span>${pendTag}`;
   lbl.className = 'prog-label' + (filled === 72 ? ' done' : '');
-  hasUnsavedChanges = true;
+  // hasUnsavedChanges se setea solo desde onScore() cuando el usuario realmente edita
 }
 
 async function saveQuiniela() {
@@ -907,6 +957,7 @@ function calcTotalPoints(participant) {
   if (!Object.keys(realResults).length) return null;
   let total = 0;
   for (const [matchIdStr, res] of Object.entries(realResults)) {
+    if (!res.final) continue; // Solo resultados FINALES suman puntos reales
     const matchId = parseInt(matchIdStr);
     const pk = (participant.picks||[]).find(p => p.id === matchId);
     if (!pk || pk.gl === '' || pk.gv === '') continue;
@@ -914,6 +965,16 @@ function calcTotalPoints(participant) {
     if (pts !== null) total += pts;
   }
   return total;
+}
+
+// Resultados solo finales (para ranking)
+function countResultadosFinales() {
+  return Object.values(realResults).filter(r => r.final).length;
+}
+
+// Resultados en vivo (partidos en curso)
+function getResultadosEnVivo() {
+  return Object.entries(realResults).filter(([,r]) => !r.final);
 }
 
 // Cuántos partidos tienen resultado real ingresado
@@ -1036,17 +1097,158 @@ async function saveResultados() {
   }
 }
 
+
+// ═══════════════════════════════════════════════════
+//  SYNC DE RESULTADOS DESDE INTERNET
+// ═══════════════════════════════════════════════════
+async function syncResultados() {
+  if (!FOOTBALL_API_KEY || FOOTBALL_API_KEY === 'TU_API_KEY_AQUI') return;
+  updateSyncStatus('syncing');
+  try {
+    const res = await fetch(
+      'https://api.football-data.org/v4/competitions/WC/matches',
+      { headers: { 'X-Auth-Token': FOOTBALL_API_KEY } }
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    const newResults = { ...realResults };
+    let updated = 0;
+
+    let liveCount = 0;
+    for (const apiMatch of (data.matches || [])) {
+      const st = apiMatch.status;
+      if (!['FINISHED','IN_PLAY','PAUSED'].includes(st)) continue;
+
+      // Obtener marcador según estado
+      let hs, as_;
+      if (st === 'FINISHED') {
+        hs = apiMatch.score?.fullTime?.home;
+        as_ = apiMatch.score?.fullTime?.away;
+      } else {
+        // En vivo: intentar fullTime (marcador corriendo), luego halfTime
+        hs = apiMatch.score?.fullTime?.home ?? apiMatch.score?.halfTime?.home;
+        as_ = apiMatch.score?.fullTime?.away ?? apiMatch.score?.halfTime?.away;
+        if (st === 'IN_PLAY') liveCount++;
+      }
+      if (hs === null || hs === undefined || as_ === null || as_ === undefined) continue;
+
+      // Buscar el partido correspondiente en nuestros MATCHES
+      const match = MATCHES.find(m => {
+        const mh = TEAM_MAP[m.local]   || m.local;
+        const ma = TEAM_MAP[m.visita]  || m.visita;
+        const ah = apiMatch.homeTeam?.name || '';
+        const aa = apiMatch.awayTeam?.name || '';
+        return (mh === ah && ma === aa) || (mh === aa && ma === ah);
+      });
+      if (!match) continue;
+
+      // Ajustar si el API invierte local/visita
+      const mh = TEAM_MAP[match.local] || match.local;
+      const ah = apiMatch.homeTeam?.name || '';
+      let gl = String(mh === ah ? hs : as_);
+      let gv = String(mh === ah ? as_ : hs);
+      const isFinal = st === 'FINISHED'; // ¿Resultado definitivo?
+
+      const key = String(match.id);
+      const prev = newResults[key];
+      if (!prev || prev.gl !== gl || prev.gv !== gv || prev.final !== isFinal) {
+        newResults[key] = { gl, gv, final: isFinal };
+        updated++;
+      }
+    }
+
+    if ((updated > 0 || liveCount > 0) && db) {
+      await db.collection(SETTINGS_COLLECTION).doc(SETTINGS_DOC).set(
+        { realResults: newResults, liveMatches: liveCount, updatedAt: Date.now() },
+        { merge: true }
+      );
+    }
+    lastSync = Date.now();
+
+    updateSyncStatus(liveCount > 0 ? 'live' : updated > 0 ? 'updated' : 'ok', updated, liveCount);
+  } catch(err) {
+    console.error('Sync error:', err);
+    updateSyncStatus('error');
+  }
+}
+
+function updateSyncStatus(state, count, live) {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  const time = new Date().toLocaleTimeString('es', {hour:'2-digit', minute:'2-digit'});
+  const msgs = {
+    syncing: {txt:'🔄 Actualizando…', color:'var(--muted)'},
+    ok:      {txt:`✅ Al día · ${time}`, color:'var(--muted)'},
+    updated: {txt:`⚽ ${count} resultado(s) nuevo(s) · ${time}`, color:'var(--green)'},
+    live:    {txt:`🔴 Partido en curso · actualizado ${time}`, color:'var(--red)'},
+    error:   {txt:`⚠️ Sin conexión · ${time}`, color:'var(--red)'},
+    nokey:   {txt:'🔑 Configura tu API key para activar el sync', color:'#d97706'},
+  };
+  const m = msgs[state] || msgs.ok;
+  el.textContent = m.txt;
+  el.style.color = m.color;
+  el.style.fontWeight = ['updated','live'].includes(state) ? '700' : '500';
+}
+
+
+// ── SYNC MANUAL ──
+// Cualquier participante puede tocar "⚽ Actualizar" y todos ven el cambio
+// vía Firebase onSnapshot. Sin polling automático.
+
+function startAutoSync() {
+  // Solo un sync inicial al cargar para reflejar el estado actual
+  if (!FOOTBALL_API_KEY || FOOTBALL_API_KEY === 'TU_API_KEY_AQUI') {
+    updateSyncStatus('nokey');
+    return;
+  }
+  syncResultados();
+}
+
+
+// Sync público — cualquier participante puede actualizar para todos
+async function syncPublic() {
+  const btn = document.querySelector('[onclick="syncPublic()"]');
+  const statusEl = document.getElementById('sync-status-pub');
+  if (btn) { btn.textContent = '🔄 Actualizando…'; btn.disabled = true; }
+  if (statusEl) statusEl.textContent = 'Consultando resultados…';
+  await syncResultados();
+  if (btn) { btn.textContent = '⚽ Actualizar'; btn.disabled = false; }
+  // El status se actualiza vía updateSyncStatus → sync-status (admin)
+  // Para el público mostramos el lastSync
+  if (statusEl && lastSync) {
+    const time = new Date(lastSync).toLocaleTimeString('es', {hour:'2-digit',minute:'2-digit'});
+    statusEl.textContent = `Última actualización: ${time}`;
+  }
+}
+
 // ── RANKING ──
 function buildRanking() {
   const el = document.getElementById('ranking-list');
+
+  // Botón de actualización manual visible para todos
+  const syncKey = FOOTBALL_API_KEY && FOOTBALL_API_KEY !== 'TU_API_KEY_AQUI';
+  const syncBar = syncKey ? `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:.85rem;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:.65rem 1rem;box-shadow:var(--shadow)">
+      <div style="flex:1;font-size:11px" id="sync-status-pub">Toca para ver si hay goles nuevos</div>
+      <button onclick="syncPublic()" style="background:var(--navy3);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0">
+        ⚽ Actualizar
+      </button>
+    </div>` : '';
+  const wrapper = document.getElementById('ranking-list').parentElement;
+  const existingBar = document.getElementById('sync-status-pub');
+  if (syncKey && !existingBar && wrapper) {
+    wrapper.insertAdjacentHTML('afterbegin', syncBar);
+  }
+
   if (!parts.length) {
     el.innerHTML = `<div class="empty-state"><span class="empty-icon">📋</span><p>Aún no hay pronósticos.<br>Comparte el link con tus participantes.</p></div>`;
     return;
   }
 
-  const hasResults = countResultados() > 0;
+  const hasResults = countResultadosFinales() > 0;
+  const liveGames  = getResultadosEnVivo();
 
-  // Sort: by real points if results available, else by fills
   const sorted = [...parts].map(p => ({
     ...p,
     realPts: hasResults ? calcTotalPoints(p) : null
@@ -1058,13 +1260,15 @@ function buildRanking() {
   const medals = ['🥇','🥈','🥉'];
 
   const modeNote = hasResults
-    ? `<div class="ranking-mode-note live">⚽ Clasificación en vivo · ${countResultados()} de 72 partidos con resultado</div>`
-    : `<div class="ranking-mode-note">📋 Participación registrada · Los puntos aparecerán cuando el admin ingrese resultados</div>`;
+    ? `<div class="ranking-mode-note live">
+        ${liveGames.length > 0 ? '🔴 ' + liveGames.length + ' partido(s) en curso' : '⚽ Clasificación'} · 
+        ${countResultadosFinales()} de 72 partidos finalizados
+       </div>`
+    : `<div class="ranking-mode-note">📋 Los puntos aparecen al finalizar los partidos</div>`;
 
   const privacyMsg = showPublicPicks ? '' : `
     <div class="private-note">
-      🔒 Los pronósticos están ocultos temporalmente para evitar copia entre participantes. 
-      Cuando el administrador active la vista pública, aquí se podrán revisar los marcadores.
+      🔒 Los pronósticos están ocultos temporalmente. Cuando el administrador active la vista pública, aquí se podrán revisar.
     </div>`;
 
   el.innerHTML = modeNote + privacyMsg + sorted.map((p, i) => {
@@ -1076,9 +1280,13 @@ function buildRanking() {
     const rows = showPublicPicks ? p.picks.map(pk => {
       const m = MATCHES.find(x => x.id === pk.id);
       const has = pk.gl !== '' && pk.gv !== '';
-      const res = realResults[pk.id];
-      const matchPts = (has && res) ? calcPoints(pk.gl, pk.gv, res.gl, res.gv) : null;
-      const ptsLabel = matchPts !== null ? `<span style="font-size:9px;font-weight:700;color:${matchPts>=50?'var(--green)':matchPts>=20?'var(--navy3)':'var(--muted)'}">${matchPts>0?'+':''}${matchPts}pts</span>` : '';
+      const res = realResults[pk.id] || realResults[String(pk.id)];
+      const isFinalRes = res && res.final;
+      const matchPts = (has && isFinalRes) ? calcPoints(pk.gl, pk.gv, res.gl, res.gv) : null;
+      const liveTxt  = (has && res && !isFinalRes) ? '🔴 '+res.gl+'-'+res.gv : '';
+      const ptsTxt   = matchPts !== null ? (matchPts > 0 ? '+' : '') + matchPts + 'pts' : liveTxt;
+      const ptColor  = matchPts !== null ? (matchPts>=50?'var(--green)':matchPts>=20?'var(--navy3)':'var(--muted)') : 'var(--red)';
+      const ptsLabel = ptsTxt ? '<span style="font-size:9px;font-weight:700;color:'+ptColor+'">'+ptsTxt+'</span>' : '';
       return `<div class="pick-row">
         <span class="pick-game">${m.lf} ${m.local} vs ${m.visita} ${m.vf}</span>
         <div style="display:flex;align-items:center;gap:6px">
@@ -1091,12 +1299,8 @@ function buildRanking() {
     const clickAttr = showPublicPicks ? `onclick="toggleRank('r${i}')"` : '';
     const chev = showPublicPicks ? `<span class="chev" id="ch-r${i}">▼</span>` : `<span class="chev">🔒</span>`;
     const body = showPublicPicks ? `<div class="rank-body" id="rb-r${i}">${rows}</div>` : '';
-
     const rightSide = hasResults
-      ? `<div style="text-align:right">
-           <div class="rank-pts-badge">${pts ?? '–'}</div>
-           <div class="rank-pts-label">puntos</div>
-         </div>`
+      ? `<div style="text-align:right"><div class="rank-pts-badge">${pts ?? '–'}</div><div class="rank-pts-label">puntos</div></div>`
       : `<span class="pct-txt">${pct}%</span>`;
 
     return `<div class="rank-card">
@@ -1109,14 +1313,9 @@ function buildRanking() {
             <div class="rank-sub">${hasResults ? (pts ?? 0) + ' pts · ' : ''}${p.filled}/72 partidos</div>
           </div>
         </div>
-        <div class="rank-right">
-          ${rightSide}
-          ${chev}
-        </div>
+        <div class="rank-right">${rightSide}${chev}</div>
       </div>
-      <div class="prog-mini">
-        <div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${pct}%"></div></div>
-      </div>
+      <div class="prog-mini"><div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${pct}%"></div></div></div>
       ${body}
     </div>`;
   }).join('');
@@ -1127,20 +1326,12 @@ function renderAdminGate() {
   const gate = document.getElementById('admin-gate');
   const controls = document.getElementById('admin-controls');
   if (!gate || !controls) return;
-
-  if (isAdmin) {
-    gate.innerHTML = '';
-    controls.style.display = 'block';
-    return;
-  }
-
+  if (isAdmin) { gate.innerHTML = ''; controls.style.display = 'block'; return; }
   controls.style.display = 'none';
   gate.innerHTML = `
     <div class="admin-lock">
       <div class="admin-lock-title">🔐 Panel de administrador</div>
-      <div class="admin-lock-desc">
-        Ingresa la clave de administrador para borrar participantes, exportar a Excel y activar la vista pública de pronósticos.
-      </div>
+      <div class="admin-lock-desc">Ingresa la clave de administrador para borrar participantes, exportar a Excel y activar la vista pública de pronósticos.</div>
       <div class="admin-pin-row">
         <input class="admin-pin-input" id="admin-pin" type="password" placeholder="Clave de administrador" onkeydown="if(event.key==='Enter') adminLogin()">
         <button class="go-btn" onclick="adminLogin()">Entrar</button>
@@ -1151,87 +1342,54 @@ function renderAdminGate() {
 
 function adminLogin() {
   const pin = document.getElementById('admin-pin')?.value || '';
-  if (pin !== ADMIN_PIN) {
-    toast('Clave incorrecta');
-    return;
-  }
+  if (pin !== ADMIN_PIN) { toast('Clave incorrecta'); return; }
   isAdmin = true;
   sessionStorage.setItem('qm26_admin', '1');
-  renderAdminGate();
-  buildAdmin();
+  renderAdminGate(); buildAdmin();
   toast('Modo administrador activado');
 }
 
 function adminLogout() {
   isAdmin = false;
   sessionStorage.removeItem('qm26_admin');
-  renderAdminGate();
-  buildAdmin();
+  renderAdminGate(); buildAdmin();
   toast('Sesión de administrador cerrada');
 }
 
 async function setPublicPicks(value) {
   if (!isAdmin) return toast('Solo el administrador puede cambiar esto');
-  if (!db) {
-    showPublicPicks = value;
-    buildAdmin();
-    buildRanking();
-    return;
-  }
+  if (!db) { showPublicPicks = value; buildAdmin(); buildRanking(); return; }
   try {
-    await db.collection(SETTINGS_COLLECTION).doc(SETTINGS_DOC).set({
-      showPublicPicks: value,
-      updatedAt: Date.now()
-    }, { merge: true });
+    await db.collection(SETTINGS_COLLECTION).doc(SETTINGS_DOC).set(
+      { showPublicPicks: value, updatedAt: Date.now() }, { merge: true });
     toast(value ? 'Pronósticos visibles para todos' : 'Pronósticos ocultos para participantes');
-  } catch (err) {
-    console.error(err);
-    toast('No se pudo cambiar la configuración');
-  }
+  } catch(err) { console.error(err); toast('No se pudo cambiar la configuración'); }
 }
-
 
 function safeHtml(text) {
-  return String(text ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+  return String(text ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
 }
 
-function exportIdForParticipant(p) {
-  return p._id || docIdFromName(p.name);
-}
+function exportIdForParticipant(p) { return p._id || docIdFromName(p.name); }
 
 function buildExportSelector(sorted) {
   const box = document.getElementById('export-select-list');
   if (!box) return;
-
   const validIds = new Set(sorted.map(exportIdForParticipant));
   selectedExportIds = new Set([...selectedExportIds].filter(id => validIds.has(id)));
-
-  // Si aún no se ha seleccionado nada, marcamos todos por comodidad.
-  if (selectedExportIds.size === 0 && sorted.length) {
+  if (selectedExportIds.size === 0 && sorted.length)
     sorted.forEach(p => selectedExportIds.add(exportIdForParticipant(p)));
-  }
-
   box.innerHTML = sorted.map(p => {
     const id = exportIdForParticipant(p);
     const checked = selectedExportIds.has(id) ? 'checked' : '';
-    return `
-      <label class="export-check">
-        <input type="checkbox" data-export-id="${safeHtml(id)}" ${checked} onchange="toggleExportSelection('${safeHtml(id)}', this.checked)">
-        <span>${safeHtml(p.name)} · ${p.filled}/72</span>
-      </label>`;
+    return `<label class="export-check"><input type="checkbox" data-export-id="${safeHtml(id)}" ${checked} onchange="toggleExportSelection('${safeHtml(id)}', this.checked)"><span>${safeHtml(p.name)} · ${p.filled}/72</span></label>`;
   }).join('');
-
   syncExportSelectionUI();
 }
 
 function toggleExportSelection(id, checked) {
-  if (checked) selectedExportIds.add(id);
-  else selectedExportIds.delete(id);
+  if (checked) selectedExportIds.add(id); else selectedExportIds.delete(id);
   syncExportSelectionUI();
 }
 
@@ -1240,8 +1398,7 @@ function selectAllExportParticipants(value) {
   checks.forEach(ch => {
     ch.checked = value;
     const id = ch.getAttribute('data-export-id');
-    if (value) selectedExportIds.add(id);
-    else selectedExportIds.delete(id);
+    if (value) selectedExportIds.add(id); else selectedExportIds.delete(id);
   });
   syncExportSelectionUI();
 }
@@ -1250,169 +1407,124 @@ function syncExportSelectionUI() {
   const help = document.getElementById('export-selected-help');
   if (!help) return;
   const n = selectedExportIds.size;
-  help.textContent = n === 0
-    ? 'Selecciona al menos un participante para copiarlo a Excel.'
-    : `${n} participante${n === 1 ? '' : 's'} seleccionado${n === 1 ? '' : 's'} para exportar.`;
+  help.textContent = n === 0 ? 'Selecciona al menos un participante para copiarlo a Excel.'
+    : `${n} participante${n===1?'':'s'} seleccionado${n===1?'':'s'} para exportar.`;
 }
 
 function getSelectedExportParticipants() {
-  const sorted = [...parts].sort((a, b) => a.name.localeCompare(b.name));
-  const selected = sorted.filter(p => selectedExportIds.has(exportIdForParticipant(p)));
-  return selected;
+  const sorted = [...parts].sort((a,b) => a.name.localeCompare(b.name));
+  return sorted.filter(p => selectedExportIds.has(exportIdForParticipant(p)));
 }
 
 function buildAdminControls() {
   const controls = document.getElementById('admin-controls');
   if (!controls) return;
   controls.innerHTML = `
+    <div class="control-card" style="margin-bottom:.75rem">
+      <div class="control-title" style="display:flex;align-items:center;gap:8px">
+        🌐 Sync de resultados
+        <span style="font-size:9px;font-weight:800;background:#e7f8ee;color:#176b3a;padding:2px 8px;border-radius:99px">MANUAL</span>
+      </div>
+      <div class="control-desc">Resultados desde <strong>football-data.org</strong>. Gratis en <a href="https://www.football-data.org/client/register" target="_blank" style="color:var(--navy3);font-weight:700">football-data.org</a>.</div>
+      <div id="sync-status" style="font-size:11px;color:var(--muted);margin:.4rem 0"></div>
+      <div style="display:flex;gap:8px;margin-top:.6rem">
+        <button onclick="syncResultados()" style="flex:1;padding:9px;background:var(--navy3);color:#fff;border:none;border-radius:var(--radius-sm);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🔄 Sincronizar ahora</button>
+      </div>
+    </div>
     <div class="control-card">
       <div class="control-title">Configuración de visibilidad</div>
-      <div class="control-desc">
-        Antes del torneo conviene mantener ocultos los marcadores para evitar copia. 
-        Al iniciar el campeonato puedes activar la vista pública.
-      </div>
+      <div class="control-desc">Antes del torneo conviene mantener ocultos los marcadores para evitar copia.</div>
       <div class="ctrl-row">
-        <span class="ctrl-badge ${showPublicPicks ? 'on' : ''}">
-          ${showPublicPicks ? 'Pronósticos visibles' : 'Pronósticos ocultos'}
-        </span>
-        <button class="toggle-btn" onclick="setPublicPicks(${showPublicPicks ? 'false' : 'true'})">
-          ${showPublicPicks ? 'Ocultar pronósticos' : 'Mostrar pronósticos'}
-        </button>
+        <span class="ctrl-badge ${showPublicPicks?'on':''}">${showPublicPicks?'Pronósticos visibles':'Pronósticos ocultos'}</span>
+        <button class="toggle-btn" onclick="setPublicPicks(${showPublicPicks?'false':'true'})">${showPublicPicks?'Ocultar pronósticos':'Mostrar pronósticos'}</button>
       </div>
       <div style="text-align:right;margin-top:.7rem">
         <button onclick="adminLogout()" style="border:none;background:none;color:#aaa;font-size:11px;cursor:pointer;font-family:inherit">Cerrar modo admin</button>
       </div>
     </div>
-  ${buildResultsAdmin()}`;
+    ${buildResultsAdmin()}`;
 }
 
 function buildAdmin() {
   renderAdminGate();
   const el = document.getElementById('admin-list');
   const expEl = document.getElementById('export-card');
-
-  if (!isAdmin) {
-    el.innerHTML = '';
-    expEl.style.display = 'none';
-    return;
-  }
-
+  if (!isAdmin) { el.innerHTML = ''; expEl.style.display = 'none'; return; }
   buildAdminControls();
-
   if (!parts.length) {
     el.innerHTML = `<div class="empty-state"><span class="empty-icon">⚙️</span><p>No hay pronósticos registrados.<br>Comparte el link para que los participantes llenen su quiniela.</p></div>`;
-    expEl.style.display = 'none';
-    return;
+    expEl.style.display = 'none'; return;
   }
   expEl.style.display = 'block';
-  const sorted = [...parts].sort((a, b) => b.filled - a.filled);
+  const sorted = [...parts].sort((a,b) => b.filled - a.filled);
   buildExportSelector(sorted);
-
-  el.innerHTML = sorted.map((p, i) => {
-    const av = AV_COLORS[i % AV_COLORS.length];
-    const ini = p.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
-    const pct = Math.round(p.filled / 72 * 100);
+  el.innerHTML = sorted.map((p,i) => {
+    const av = AV_COLORS[i%AV_COLORS.length];
+    const ini = p.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+    const pct = Math.round(p.filled/72*100);
     const rows = p.picks.map(pk => {
-      const m = MATCHES.find(x => x.id === pk.id);
-      const has = pk.gl !== '' && pk.gv !== '';
-      return `<div class="pick-row">
-        <span class="pick-game">${m.lf} ${m.local} vs ${m.visita} ${m.vf}</span>
-        <span class="pick-score${has ? '' : ' empty'}">${has ? pk.gl + ' – ' + pk.gv : '–'}</span>
-      </div>`;
+      const m = MATCHES.find(x=>x.id===pk.id);
+      const has = pk.gl!==''&&pk.gv!=='';
+      return `<div class="pick-row"><span class="pick-game">${m.lf} ${m.local} vs ${m.visita} ${m.vf}</span><span class="pick-score${has?'':' empty'}">${has?pk.gl+' – '+pk.gv:'–'}</span></div>`;
     }).join('');
-
     return `<div class="rank-card">
       <div class="rank-head" onclick="toggleRank('a${i}')">
         <div class="rank-left">
           <div class="avatar" style="background:${av.bg};color:${av.c}">${ini}</div>
-          <div>
-            <div class="rank-name">${p.name}</div>
-            <div class="rank-sub">${p.filled}/72 · ${pct}% completado</div>
-          </div>
+          <div><div class="rank-name">${p.name}</div><div class="rank-sub">${p.filled}/72 · ${pct}% completado</div></div>
         </div>
         <div class="rank-right">
           <button class="del-btn" onclick="event.stopPropagation();delPart('${p.name.replace(/'/g,"\\'")}')">✕</button>
           <span class="chev" id="ch-a${i}">▼</span>
         </div>
       </div>
-      <div class="prog-mini">
-        <div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${pct}%"></div></div>
-      </div>
+      <div class="prog-mini"><div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${pct}%"></div></div></div>
       <div class="rank-body" id="rb-a${i}">${rows}</div>
     </div>`;
   }).join('');
 }
 
 function toggleRank(id) {
-  document.getElementById('rb-' + id).classList.toggle('open');
-  document.getElementById('ch-' + id).classList.toggle('open');
+  document.getElementById('rb-'+id).classList.toggle('open');
+  document.getElementById('ch-'+id).classList.toggle('open');
 }
+
 async function delPart(name) {
   if (!isAdmin) return toast('Solo el administrador puede eliminar');
   if (!confirm(`¿Eliminar pronóstico de ${name}?`)) return;
-
-  if (!db) {
-    parts = parts.filter(p => p.name !== name);
-    persist(); buildAdmin();
-    return;
-  }
-
-  try {
-    await db.collection(COLLECTION).doc(docIdFromName(name)).delete();
-    toast('Participante eliminado');
-  } catch (err) {
-    console.error(err);
-    toast('No se pudo eliminar');
-  }
+  if (!db) { parts = parts.filter(p=>p.name!==name); persist(); buildAdmin(); return; }
+  try { await db.collection(COLLECTION).doc(docIdFromName(name)).delete(); toast('Participante eliminado'); }
+  catch(err) { console.error(err); toast('No se pudo eliminar'); }
 }
 
 async function clearAll() {
   if (!isAdmin) return toast('Solo el administrador puede borrar todo');
   if (!confirm('¿Borrar TODOS los pronósticos? Esta acción no se puede deshacer.')) return;
-
-  if (!db) {
-    parts = []; persist(); buildAdmin();
-    return;
-  }
-
+  if (!db) { parts=[]; persist(); buildAdmin(); return; }
   try {
     const snap = await db.collection(COLLECTION).get();
     const batch = db.batch();
     snap.docs.forEach(doc => batch.delete(doc.ref));
     await batch.commit();
     toast('Todos los pronósticos fueron borrados');
-  } catch (err) {
-    console.error(err);
-    toast('No se pudieron borrar los datos');
-  }
+  } catch(err) { console.error(err); toast('No se pudieron borrar los datos'); }
 }
 
 // ── EXPORT ──
-function buildExcelTSV(selectedParts = null) {
-  // Formato para Excel:
-  // Columnas = participantes seleccionados; filas = partidos.
-  // Cada participante usa 2 columnas: goles local y goles visita.
+function buildExcelTSV(selectedParts=null) {
   const selected = selectedParts || getSelectedExportParticipants();
   if (!selected.length) return '';
-
   const header = [];
-  selected.forEach(p => {
-    header.push(p.name);
-    header.push('');
-  });
-
+  selected.forEach(p => { header.push(p.name); header.push(''); });
   const lines = [header.join('\t')];
-
   MATCHES.forEach(m => {
     const row = [];
     selected.forEach(p => {
-      const pk = p.picks.find(x => x.id === m.id);
-      row.push(pk && pk.gl !== '' ? pk.gl : '');
-      row.push(pk && pk.gv !== '' ? pk.gv : '');
+      const pk = p.picks.find(x=>x.id===m.id);
+      row.push(pk&&pk.gl!==''?pk.gl:''); row.push(pk&&pk.gv!==''?pk.gv:'');
     });
     lines.push(row.join('\t'));
   });
-
   return lines.join('\n');
 }
 
@@ -1422,12 +1534,12 @@ function copyForExcel() {
   if (!selected.length) return toast('Selecciona al menos un participante');
   const txt = buildExcelTSV(selected);
   navigator.clipboard.writeText(txt)
-    .then(() => toast(`¡Copiado! ${selected.length} participante${selected.length === 1 ? '' : 's'} seleccionado${selected.length === 1 ? '' : 's'}`))
+    .then(() => toast(`¡Copiado! ${selected.length} participante${selected.length===1?'':'s'}`))
     .catch(() => {
       const ta = document.createElement('textarea');
       ta.value = txt; document.body.appendChild(ta); ta.select();
       document.execCommand('copy'); document.body.removeChild(ta);
-      toast(`¡Copiado! ${selected.length} participante${selected.length === 1 ? '' : 's'} seleccionado${selected.length === 1 ? '' : 's'}`);
+      toast(`¡Copiado! ${selected.length} participante${selected.length===1?'':'s'}`);
     });
 }
 
@@ -1435,40 +1547,27 @@ function downloadCSV() {
   if (!isAdmin) return toast('Solo el administrador puede descargar CSV');
   const sorted = getSelectedExportParticipants();
   if (!sorted.length) return toast('Selecciona al menos un participante');
-
-  const header = ['#', 'Local', 'Visita'];
-  sorted.forEach(p => {
-    header.push(`${p.name} Local`);
-    header.push(`${p.name} Visita`);
-  });
-
+  const header = ['#','Local','Visita'];
+  sorted.forEach(p => { header.push(`${p.name} Local`); header.push(`${p.name} Visita`); });
   const rows = [header];
   MATCHES.forEach(m => {
     const row = [m.id, m.local, m.visita];
     sorted.forEach(p => {
-      const pk = p.picks.find(x => x.id === m.id);
-      row.push(pk && pk.gl !== '' ? pk.gl : '');
-      row.push(pk && pk.gv !== '' ? pk.gv : '');
+      const pk = p.picks.find(x=>x.id===m.id);
+      row.push(pk&&pk.gl!==''?pk.gl:''); row.push(pk&&pk.gv!==''?pk.gv:'');
     });
     rows.push(row);
   });
-
-  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+  const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = 'quiniela_mundial2026_seleccionados.csv';
+  const a = document.createElement('a'); a.href=url; a.download='quiniela_mundial2026_seleccionados.csv';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  toast(`CSV descargado: ${sorted.length} participante${sorted.length === 1 ? '' : 's'}`);
+  toast(`CSV descargado: ${sorted.length} participante${sorted.length===1?'':'s'}`);
 }
 
-
-// ═══════════════════════════════════════
-//  DATOS — DATE_MAP, calcPoints, etc.
-// ═══════════════════════════════════════
-
-// DATE_MAP ya construido arriba desde MATCHES
-
+// ── SCORING ──
 function calcPoints(myGl, myGv, realGl, realGv) {
   const ml=parseInt(myGl),mv=parseInt(myGv),rl=parseInt(realGl),rv=parseInt(realGv);
   if(isNaN(ml)||isNaN(mv)||isNaN(rl)||isNaN(rv)) return null;
@@ -1488,35 +1587,25 @@ function toggleScoringLegend() {
   document.getElementById('scoring-chev').classList.toggle('open');
 }
 
-// ═══════════════════════════════════════
-//  PRÓXIMOS PARTIDOS + SIMULADOR
-// ═══════════════════════════════════════
+// ── PRÓXIMOS PARTIDOS + SIMULADOR ──
 function buildUpcoming() {
   const wrap = document.getElementById('upcoming-section');
   if (!wrap) return;
   const now = new Date();
   const today = new Date(now.getFullYear(),now.getMonth(),now.getDate());
   const limit = new Date(today); limit.setDate(today.getDate()+2);
-
   const upcoming = MATCHES.filter(m => {
     const d = DATE_MAP[m.date]; if (!d) return false;
     const md = new Date(d.getFullYear(),d.getMonth(),d.getDate());
     return md >= today && md < limit;
   });
-
   if (!upcoming.length) {
     const future = MATCHES.filter(m=>{const d=DATE_MAP[m.date];return d&&new Date(d.getFullYear(),d.getMonth(),d.getDate())>=today;});
     if (!future.length) { wrap.innerHTML=''; return; }
     wrap.innerHTML=`<div class="upcoming-none">No hay partidos hoy ni mañana · Próximos: <strong>${future[0].date}</strong></div>`;
     return;
   }
-
-  let html = `<div class="upcoming-section">
-    <div class="upcoming-header">
-      <div class="upcoming-title"><span class="live-dot"></span>Próximos partidos</div>
-      <span class="upcoming-date-label">Hoy y mañana</span>
-    </div>`;
-
+  let html = `<div class="upcoming-section"><div class="upcoming-header"><div class="upcoming-title"><span class="live-dot"></span>Próximos partidos</div><span class="upcoming-date-label">Hoy y mañana</span></div>`;
   upcoming.forEach(m => {
     const gd = G[m.grp];
     const withPick = parts.filter(p=>{const pk=(p.picks||[]).find(x=>x.id===m.id);return pk&&pk.gl!==''&&pk.gv!=='';}).length;
@@ -1525,7 +1614,6 @@ function buildUpcoming() {
       ? `Ver pronósticos <span class="upcoming-chevron" id="uchev-${m.id}">▼</span>`
       : `<span style="color:var(--muted)">🔒 Pronósticos ocultos</span>`;
     const simBtnHtml = `<span class="upcoming-expand-hint" style="color:var(--gold)" onclick="event.stopPropagation();toggleSimulator(${m.id})">🧮 Simular puntos <span class="upcoming-chevron" id="simchev-${m.id}">▼</span></span>`;
-
     html += `<div class="upcoming-card" style="border-left:3px solid ${gd.c}">
       <div class="upcoming-top" style="background:${gd.c}">
         <span class="upcoming-match-date">Grupo ${m.grp} · ${m.date}</span>
@@ -1589,19 +1677,15 @@ function buildSimulatorInner(m) {
   </div>
   <div class="sim-input-row">
     <span class="sim-label">${m.lf} ${m.local}</span>
-    <input class="sim-score-box" type="number" id="simgl-${m.id}" min="0" max="20" placeholder="–"
-      inputmode="decimal" pattern="[0-9]*" oninput="onSimInput(${m.id})">
+    <input class="sim-score-box" type="number" id="simgl-${m.id}" min="0" max="20" placeholder="–" inputmode="decimal" pattern="[0-9]*" oninput="onSimInput(${m.id})">
     <span class="sim-dash">–</span>
-    <input class="sim-score-box" type="number" id="simgv-${m.id}" min="0" max="20" placeholder="–"
-      inputmode="decimal" pattern="[0-9]*" oninput="onSimInput(${m.id})">
+    <input class="sim-score-box" type="number" id="simgv-${m.id}" min="0" max="20" placeholder="–" inputmode="decimal" pattern="[0-9]*" oninput="onSimInput(${m.id})">
     <span class="sim-label">${m.visita} ${m.vf}</span>
   </div>
   <div style="padding:4px 12px 8px;text-align:center;font-size:10px;color:#92400e;background:#fff8e8;border-bottom:1px solid #fde68a">
     Los puntos se calculan automáticamente al ingresar el marcador
   </div>
-  <div class="sim-results" id="simresults-${m.id}">
-    <div class="sim-no-picks">Ingresa el marcador hipotético para calcular</div>
-  </div>`;
+  <div class="sim-results" id="simresults-${m.id}"><div class="sim-no-picks">Ingresa el marcador hipotético para calcular</div></div>`;
 }
 
 function toggleSimulator(matchId) {
@@ -1615,31 +1699,29 @@ function toggleSimulator(matchId) {
 }
 
 function onSimInput(matchId) {
-  const gl = document.getElementById('simgl-'+matchId)?.value;
-  const gv = document.getElementById('simgv-'+matchId)?.value;
-  if (gl !== '' && gl !== undefined && gv !== '' && gv !== undefined) {
-    runSimulation(matchId);
-  }
+  const gl=document.getElementById('simgl-'+matchId)?.value;
+  const gv=document.getElementById('simgv-'+matchId)?.value;
+  if (gl!==''&&gl!==undefined&&gv!==''&&gv!==undefined) runSimulation(matchId);
 }
 
 function runSimulation(matchId) {
   const gl=document.getElementById('simgl-'+matchId)?.value;
   const gv=document.getElementById('simgv-'+matchId)?.value;
-  if (!gl || !gv || gl==='' || gv==='') { document.getElementById('simresults-'+matchId).innerHTML='<div class="sim-no-picks">Ingresa ambos goles para calcular</div>'; return; }
+  if (!gl||!gv||gl===''||gv==='') {
+    const rc=document.getElementById('simresults-'+matchId);
+    if(rc) rc.innerHTML='<div class="sim-no-picks">Ingresa ambos goles para calcular</div>';
+    return;
+  }
   const resultsContainer=document.getElementById('simresults-'+matchId);
   if (!resultsContainer) return;
-  // FIX 8: const m BEFORE html construction
-  const m = MATCHES.find(x=>x.id===matchId);
+  const m=MATCHES.find(x=>x.id===matchId);
   const simParticipants=parts.filter(p=>{const pk=(p.picks||[]).find(x=>x.id===matchId);return pk&&pk.gl!==''&&pk.gv!=='';})
     .map(p=>{const pk=(p.picks||[]).find(x=>x.id===matchId);const pts=calcPoints(pk.gl,pk.gv,gl,gv);return{...p,simPts:pts,pickGl:pk.gl,pickGv:pk.gv};});
   if (!simParticipants.length){resultsContainer.innerHTML='<div class="sim-no-picks">Ningún participante tiene pronóstico para este partido.</div>';return;}
   simParticipants.sort((a,b)=>(b.simPts??-1)-(a.simPts??-1));
   const gainClass=pts=>pts===50?'gain-50':pts===30?'gain-30':pts===20?'gain-20':pts===10?'gain-10':'gain-0';
   const gainLabel=pts=>pts===50?'⭐⭐⭐⭐ +50':pts===30?'⭐⭐⭐ +30':pts===20?'⭐⭐ +20':pts===10?'⭐ +10':'✕ +0';
-  let html=`<div class="sim-results-header">
-    <span class="sim-results-title">Simulado: ${m?m.lf:''} ${gl} – ${gv} ${m?m.vf:''}</span>
-    <span class="sim-results-hint">Solo tú ves esto</span>
-  </div>`;
+  let html=`<div class="sim-results-header"><span class="sim-results-title">Simulado: ${m?m.lf:''} ${gl} – ${gv} ${m?m.vf:''}</span><span class="sim-results-hint">Solo tú ves esto</span></div>`;
   simParticipants.forEach((p,i)=>{
     const isMe=me&&p.name.toLowerCase()===me.toLowerCase();
     const av=AV_COLORS[i%AV_COLORS.length];
@@ -1697,6 +1779,7 @@ function toggleEditMode() {
   const sb=document.getElementById('submit-bar'),pw=document.getElementById('prog-wrap');
   if (editModeActive) {
     if (!document.getElementById('gl-1')){renderGames();prefill();refreshProgress();}
+    hasUnsavedChanges=false;
     gw.style.display='block';mw.style.display='none';sb.style.display='block';pw.style.display='block';
     setTimeout(()=>scrollToFirstMissing(),200);
   } else {
@@ -1714,9 +1797,7 @@ function scrollToFirstMissing() {
   }
 }
 
-// ═══════════════════════════════════════
-//  PWA — INSTALAR CON HERO BUTTON + SNOOZE 24H
-// ═══════════════════════════════════════
+// ── PWA ──
 (function injectManifest() {
   const manifest={name:"Quiniela Mundial 2026",short_name:"Mundial 2026",start_url:"./",display:"standalone",background_color:"#1A1A2E",theme_color:"#1A1A2E",orientation:"portrait",
     icons:[{src:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' fill='%231A1A2E'/%3E%3Ctext y='155' x='16' font-size='160'%3E%E2%9A%BD%3C/text%3E%3C/svg%3E",sizes:"192x192",type:"image/svg+xml"}]};
@@ -1763,42 +1844,4 @@ window.addEventListener('appinstalled',()=>{hideInstallButton();deferredInstallP
 
 function installPWA() {
   document.getElementById('install-banner').classList.remove('show');
-  if (deferredInstallPrompt){deferredInstallPrompt.prompt();deferredInstallPrompt.userChoice.then(r=>{if(r.outcome==='accepted')toast('✅ Instalando...');deferredInstallPrompt=null;hideInstallButton();});}
-  else if (isIOS()){document.getElementById('ios-tip').classList.add('show');}
-  else{toast('Abre el menú del navegador → "Agregar a pantalla de inicio"');}
-}
-
-// FIX 5: Snooze 24h en lugar de bloquear para siempre
-function dismissInstall() {
-  document.getElementById('install-banner').classList.remove('show');
-  localStorage.setItem('pwa_snoozed',String(Date.now()+24*60*60*1000));
-}
-
-window.addEventListener('load',()=>{
-  if (isInStandaloneMode()){hideInstallButton();return;}
-  if (isIOS()){
-    showInstallButton();
-    const iosSnoozed=parseInt(localStorage.getItem('ios_snoozed')||'0');
-    if (Date.now()>iosSnoozed) setTimeout(()=>document.getElementById('ios-tip').classList.add('show'),3000);
-  }
-});
-
-let hasUnsavedChanges=false;
-let realResults = {}; // {matchId: {gl, gv}} resultados reales por partido
-window.addEventListener('beforeunload',e=>{if(hasUnsavedChanges){e.preventDefault();e.returnValue='';}});
-
-
-// ── TOAST ──
-function toast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  clearTimeout(t._tid);
-  t._tid = setTimeout(() => t.classList.remove('show'), 3200);
-}
-
-// ── INIT ──
-load();
-setTimeout(buildUpcoming, 150);
-</script>
-</body>
-</html>
+  if (
