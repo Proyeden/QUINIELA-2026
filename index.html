@@ -1176,44 +1176,66 @@ async function syncResultados() {
       console.log('[Sync]', msg);
     };
 
-    const fetchESPN = async (date) => {
-      const url = ESPN_API + (date ? `?dates=${date}` : '');
-      setDebug(`Consultando ESPN: ${url.slice(-20)}…`);
-      // Intentar directo primero
-      try {
-        const r = await fetch(url, { signal: controller.signal });
-        if (r.ok) { setDebug('ESPN directo OK'); return r.json(); }
-        setDebug(`ESPN directo: ${r.status}`);
-      } catch(e) { setDebug(`ESPN directo falló: ${e.message.slice(0,40)}`); }
-      // Fallback: proxy CORS
-      const proxy = 'https://corsproxy.io/?url=' + encodeURIComponent(url);
-      setDebug('Intentando proxy CORS…');
-      try {
-        const r2 = await fetch(proxy, { signal: controller.signal });
-        if (r2.ok) { setDebug('Proxy OK'); return r2.json(); }
-        setDebug(`Proxy error: ${r2.status}`);
-        throw new Error(`HTTP ${r2.status}`);
-      } catch(e2) {
-        setDebug(`Proxy falló: ${e2.message.slice(0,40)}`);
-        throw e2;
-      }
+    const setBtnMsg = (msg) => {
+      const b = document.getElementById('upcoming-refresh-btn');
+      if (b) b.textContent = msg;
+      setDebug(msg);
     };
 
+    // Intentar múltiples URLs de ESPN para el Mundial 2026
+    const ESPN_URLS = [
+      ESPN_API,
+      'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard',
+      'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world.2026/scoreboard',
+    ];
+
+    const fetchESPN = async (date) => {
+      const qs = date ? `?dates=${date}` : '';
+      for (const base of ESPN_URLS) {
+        const url = base + qs;
+        // Intentar directo primero
+        try {
+          const r = await fetch(url, { signal: controller.signal });
+          if (r.ok) {
+            const d = await r.json();
+            if ((d.events||[]).length > 0 || date) return d;
+          }
+        } catch(_) {}
+        // Proxy CORS
+        try {
+          const proxy = 'https://corsproxy.io/?url=' + encodeURIComponent(url);
+          const r2 = await fetch(proxy, { signal: controller.signal });
+          if (r2.ok) {
+            const d2 = await r2.json();
+            if ((d2.events||[]).length > 0 || date) return d2;
+          }
+        } catch(_) {}
+      }
+      return {events:[]};
+    };
+
+    setBtnMsg('🔄 Consultando…');
     const [todayData, ayerData] = await Promise.all([
-      fetchESPN(fmtESPN(now)).catch(e=>{ console.error('today failed',e); return {events:[]}; }),
-      fetchESPN(fmtESPN(ayer)).catch(e=>{ console.error('ayer failed',e); return {events:[]}; }),
+      fetchESPN(fmtESPN(now)).catch(()=>({events:[]})),
+      fetchESPN(fmtESPN(ayer)).catch(()=>({events:[]})),
     ]);
     clearTimeout(timeout);
 
     const allEvents = [...(ayerData.events||[]), ...(todayData.events||[])];
-    setDebug(`ESPN: ${allEvents.length} evento(s) recibidos hoy/ayer`);
-    // Log team names for debugging mismatches
-    allEvents.forEach(ev => {
-      const comp = ev.competitions?.[0];
-      const sts = comp?.status?.type?.name || '?';
-      const teams = (comp?.competitors||[]).map(c=>c.team?.displayName||'?').join(' vs ');
-      console.log(`[ESPN] ${sts}: ${teams} | score: ${(comp?.competitors||[]).map(c=>c.score||'?').join('-')}`);
-    });
+
+    if (allEvents.length === 0) {
+      setBtnMsg('⚠️ ESPN: 0 partidos encontrados');
+      toast('⚠️ No se recibieron datos de ESPN');
+      updateSyncStatus('error');
+      return;
+    }
+
+    // Mostrar nombres de equipos en toast para verificar mapeo
+    const teamNames = allEvents.flatMap(ev =>
+      (ev.competitions?.[0]?.competitors||[]).map(c => c.team?.displayName||'')
+    ).filter(Boolean).join(', ');
+    setBtnMsg(`ESPN: ${allEvents.length} partidos`);
+    toast(`ESPN: ${allEvents.length} partido(s) — ${teamNames.slice(0,60)}`);
 
     const newResults = { ...realResults };
     let updated = 0;
@@ -1744,6 +1766,7 @@ function refreshOpenSimulators() {
 
 // Actualizar desde la cartelera de próximos partidos
 async function syncAndRefreshUpcoming() {
+  toast('🔄 Actualizando…'); // confirmación inmediata de que el botón funciona
   const btn = document.getElementById('upcoming-refresh-btn');
   if (btn) { btn.textContent = '🔄 Actualizando…'; btn.disabled = true; }
 
@@ -1751,6 +1774,7 @@ async function syncAndRefreshUpcoming() {
   const tiempoDesdeSync = Date.now() - (lastApiSync || 0);
 
   if (tiempoDesdeSync < SYNC_COOLDOWN) {
+    toast('⏱ Cooldown activo — ' + Math.round(tiempoDesdeSync/1000) + 's desde último sync');
     // Ya se sincronizó recientemente — solo refrescar vista
     buildUpcoming();
     const hace = Math.round(tiempoDesdeSync / 1000);
