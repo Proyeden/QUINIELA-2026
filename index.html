@@ -1176,66 +1176,31 @@ async function syncResultados() {
       console.log('[Sync]', msg);
     };
 
-    const setBtnMsg = (msg) => {
-      const b = document.getElementById('upcoming-refresh-btn');
-      if (b) b.textContent = msg;
-      setDebug(msg);
+    // Netlify Function como proxy — sin bloqueo CORS
+    const fetchScores = async (date) => {
+      const qs = date ? `?date=${date}` : '';
+      const r = await fetch(`/.netlify/functions/scores${qs}`, {
+        signal: controller.signal
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
     };
 
-    // Intentar múltiples URLs de ESPN para el Mundial 2026
-    const ESPN_URLS = [
-      ESPN_API,
-      'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard',
-      'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world.2026/scoreboard',
-    ];
-
-    const fetchESPN = async (date) => {
-      const qs = date ? `?dates=${date}` : '';
-      for (const base of ESPN_URLS) {
-        const url = base + qs;
-        // Intentar directo primero
-        try {
-          const r = await fetch(url, { signal: controller.signal });
-          if (r.ok) {
-            const d = await r.json();
-            if ((d.events||[]).length > 0 || date) return d;
-          }
-        } catch(_) {}
-        // Proxy CORS
-        try {
-          const proxy = 'https://corsproxy.io/?url=' + encodeURIComponent(url);
-          const r2 = await fetch(proxy, { signal: controller.signal });
-          if (r2.ok) {
-            const d2 = await r2.json();
-            if ((d2.events||[]).length > 0 || date) return d2;
-          }
-        } catch(_) {}
-      }
-      return {events:[]};
-    };
-
-    setBtnMsg('🔄 Consultando…');
+    
     const [todayData, ayerData] = await Promise.all([
-      fetchESPN(fmtESPN(now)).catch(()=>({events:[]})),
-      fetchESPN(fmtESPN(ayer)).catch(()=>({events:[]})),
+      fetchScores(fmtESPN(now)).catch(()=>({events:[]})),
+      fetchScores(fmtESPN(ayer)).catch(()=>({events:[]})),
     ]);
     clearTimeout(timeout);
 
     const allEvents = [...(ayerData.events||[]), ...(todayData.events||[])];
 
     if (allEvents.length === 0) {
-      setBtnMsg('⚠️ ESPN: 0 partidos encontrados');
-      toast('⚠️ No se recibieron datos de ESPN');
-      updateSyncStatus('error');
+      toast('ℹ️ Sin partidos hoy — ingresa resultados manualmente');
+      updateSyncStatus('ok', 0, 0);
       return;
     }
-
-    // Mostrar nombres de equipos en toast para verificar mapeo
-    const teamNames = allEvents.flatMap(ev =>
-      (ev.competitions?.[0]?.competitors||[]).map(c => c.team?.displayName||'')
-    ).filter(Boolean).join(', ');
-    setBtnMsg(`ESPN: ${allEvents.length} partidos`);
-    toast(`ESPN: ${allEvents.length} partido(s) — ${teamNames.slice(0,60)}`);
+    toast(`⚽ ${allEvents.length} partido(s) encontrados`);
 
     const newResults = { ...realResults };
     let updated = 0;
@@ -1766,7 +1731,7 @@ function refreshOpenSimulators() {
 
 // Actualizar desde la cartelera de próximos partidos
 async function syncAndRefreshUpcoming() {
-  toast('🔄 Actualizando…'); // confirmación inmediata de que el botón funciona
+  toast('🔄 Actualizando vista…');
   const btn = document.getElementById('upcoming-refresh-btn');
   if (btn) { btn.textContent = '🔄 Actualizando…'; btn.disabled = true; }
 
