@@ -375,6 +375,19 @@ body{font-family:'DM Sans',sans-serif;background:var(--light);color:var(--text);
 .rank-pts-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-top:1px;text-align:right}
 .ranking-mode-note{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:.85rem;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;box-shadow:var(--shadow)}
 .ranking-mode-note.live{background:#e7f8ee;border-color:#a7d7b8;color:#176b3a;font-weight:600}
+
+/* ── MARCADOR EN CARTELERA ── */
+.upcoming-score{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:60px}
+.upcoming-score-nums{font-family:'Bebas Neue',sans-serif;font-size:28px;font-weight:800;letter-spacing:2px;line-height:1;color:var(--navy)}
+.upcoming-score-nums.live{color:var(--red);animation:scorePulse 2s infinite}
+.upcoming-score-nums.final{color:var(--green)}
+@keyframes scorePulse{0%,100%{opacity:1}50%{opacity:.6}}
+.upcoming-score-badge{font-size:8px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 6px;border-radius:99px}
+.upcoming-score-badge.live{background:var(--red);color:#fff}
+.upcoming-score-badge.final{background:var(--green);color:#fff}
+.upcoming-refresh-btn{background:var(--navy3);color:#fff;border:none;border-radius:var(--radius-sm);padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px;transition:.15s}
+.upcoming-refresh-btn:hover{background:var(--red)}
+.upcoming-refresh-btn:disabled{opacity:.5;cursor:default}
 </style>
 </head>
 <body>
@@ -1344,9 +1357,10 @@ function buildRanking() {
       const m = MATCHES.find(x => x.id === pk.id);
       const has = pk.gl !== '' && pk.gv !== '';
       const res = realResults[pk.id] || realResults[String(pk.id)];
-      const isFinalRes = res && res.final;
+      // final:true o undefined (manual) = final · final:false = en vivo
+      const isFinalRes = res && res.final !== false;
       const matchPts = (has && isFinalRes) ? calcPoints(pk.gl, pk.gv, res.gl, res.gv) : null;
-      const liveTxt  = (has && res && !isFinalRes) ? '🔴 '+res.gl+'-'+res.gv : '';
+      const liveTxt  = (has && res && res.final === false) ? '🔴 '+res.gl+'-'+res.gv : '';
       const ptsTxt   = matchPts !== null ? (matchPts > 0 ? '+' : '') + matchPts + 'pts' : liveTxt;
       const ptColor  = matchPts !== null ? (matchPts>=50?'var(--green)':matchPts>=20?'var(--navy3)':'var(--muted)') : 'var(--red)';
       const ptsLabel = ptsTxt ? '<span style="font-size:9px;font-weight:700;color:'+ptColor+'">'+ptsTxt+'</span>' : '';
@@ -1653,6 +1667,20 @@ function toggleScoringLegend() {
 // Refresca simuladores abiertos cuando cambia un resultado real (vía Firebase)
 function refreshOpenSimulators() {
   MATCHES.forEach(m => {
+    // Actualizar score en la cartelera si está en vivo o finalizado
+    const ubody = document.getElementById('ubody-' + m.id);
+    if (ubody) {
+      const r = realResults[m.id] || realResults[String(m.id)];
+      if (r) {
+        const isFinal = r.final !== false;
+        const scoreHTML = isFinal
+          ? `<div class="upcoming-score"><div class="upcoming-score-nums final">${r.gl} – ${r.gv}</div><span class="upcoming-score-badge final">FINAL</span></div>`
+          : `<div class="upcoming-score"><div class="upcoming-score-nums live">${r.gl} – ${r.gv}</div><span class="upcoming-score-badge live">EN VIVO</span></div>`;
+        const vsEl = ubody.querySelector('.upcoming-vs, .upcoming-score');
+        if (vsEl) vsEl.outerHTML = scoreHTML;
+      }
+    }
+    // Actualizar simuladores abiertos
     const card = document.getElementById('sim-' + m.id);
     if (card && card.style.display !== 'none') {
       card.innerHTML = buildSimulatorInner(m);
@@ -1661,10 +1689,72 @@ function refreshOpenSimulators() {
         setTimeout(() => runSimulation(m.id), 50);
       }
     }
+    // Auto-abrir simulador si el partido acaba de ponerse EN VIVO
+    const r2 = realResults[m.id] || realResults[String(m.id)];
+    if (r2 && r2.final === false) {
+      const simCard = document.getElementById('sim-' + m.id);
+      if (simCard && simCard.style.display === 'none') {
+        toggleSimulator(m.id);
+      }
+    }
   });
 }
 
+
+// Actualizar desde la cartelera de próximos partidos
+async function syncAndRefreshUpcoming() {
+  const btn = document.getElementById('upcoming-refresh-btn');
+  if (btn) { btn.textContent = '🔄 Actualizando…'; btn.disabled = true; }
+
+  const SYNC_COOLDOWN = 2 * 60 * 1000;
+  const tiempoDesdeSync = Date.now() - (lastApiSync || 0);
+
+  if (tiempoDesdeSync < SYNC_COOLDOWN) {
+    // Ya se sincronizó recientemente — solo refrescar vista
+    buildUpcoming();
+    const hace = Math.round(tiempoDesdeSync / 1000);
+    const b2 = document.getElementById('upcoming-refresh-btn');
+    if (b2) { b2.textContent = `✅ Hace ${hace}s`; b2.disabled = false; }
+    setTimeout(() => {
+      const b3 = document.getElementById('upcoming-refresh-btn');
+      if (b3) b3.textContent = '🔄 Actualizar';
+    }, 2000);
+    return;
+  }
+
+  // Llamar a la API y actualizar
+  await syncResultados();
+  buildUpcoming();
+
+  // Auto-abrir simuladores de partidos EN VIVO
+  MATCHES.forEach(m => {
+    const r = realResults[m.id] || realResults[String(m.id)];
+    if (r && r.final === false) {
+      const card = document.getElementById('sim-' + m.id);
+      if (card && card.style.display === 'none') {
+        toggleSimulator(m.id);
+      }
+    }
+  });
+
+  const b2 = document.getElementById('upcoming-refresh-btn');
+  const time = new Date().toLocaleTimeString('es', {hour:'2-digit',minute:'2-digit'});
+  if (b2) { b2.textContent = `✅ ${time}`; b2.disabled = false; }
+  setTimeout(() => {
+    const b3 = document.getElementById('upcoming-refresh-btn');
+    if (b3) b3.textContent = '🔄 Actualizar';
+  }, 3000);
+}
+
 // ── PRÓXIMOS PARTIDOS + SIMULADOR ──
+function buildUpcomingScore(matchId) {
+  const r = realResults[matchId] || realResults[String(matchId)];
+  if (!r) return '<div class="upcoming-vs">vs</div>';
+  if (r.final === false)
+    return '<div class="upcoming-score"><div class="upcoming-score-nums live">'+r.gl+' – '+r.gv+'</div><span class="upcoming-score-badge live">EN VIVO</span></div>';
+  return '<div class="upcoming-score"><div class="upcoming-score-nums final">'+r.gl+' – '+r.gv+'</div><span class="upcoming-score-badge final">FINAL</span></div>';
+}
+
 function buildUpcoming() {
   const wrap = document.getElementById('upcoming-section');
   if (!wrap) return;
@@ -1689,7 +1779,15 @@ function buildUpcoming() {
     wrap.innerHTML=`<div class="upcoming-none">No hay partidos hoy ni mañana · Próximos: <strong>${future[0].date}</strong></div>`;
     return;
   }
-  let html = `<div class="upcoming-section"><div class="upcoming-header"><div class="upcoming-title"><span class="live-dot"></span>Próximos partidos</div><span class="upcoming-date-label">Hoy y mañana</span></div>`;
+  const hasLive = upcoming.some(m => {
+    const r = realResults[m.id]||realResults[String(m.id)];
+    return r && r.final === false;
+  });
+  let html = `<div class="upcoming-section">
+    <div class="upcoming-header">
+      <div class="upcoming-title">${hasLive?'<span class="live-dot"></span>':''}Próximos partidos</div>
+      <button class="upcoming-refresh-btn" id="upcoming-refresh-btn" onclick="syncAndRefreshUpcoming()">🔄 Actualizar</button>
+    </div>`;
   upcoming.forEach(m => {
     const gd = G[m.grp];
     const withPick = parts.filter(p=>{const pk=(p.picks||[]).find(x=>x.id===m.id);return pk&&pk.gl!==''&&pk.gv!=='';}).length;
@@ -1703,9 +1801,9 @@ function buildUpcoming() {
         <span class="upcoming-match-date">Grupo ${m.grp} · ${m.date} · ${m.time}</span>
         <span class="upcoming-venue">${m.tv || 'Tigo Sports'}</span>
       </div>
-      <div class="upcoming-body">
+      <div class="upcoming-body" id="ubody-${m.id}">
         <div class="upcoming-team r"><span class="upcoming-flag">${m.lf}</span>${m.local}</div>
-        <div class="upcoming-vs">vs</div>
+        ${buildUpcomingScore(m.id)}
         <div class="upcoming-team"><span class="upcoming-flag">${m.vf}</span>${m.visita}</div>
       </div>
       <div class="upcoming-footer">
