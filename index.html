@@ -1168,28 +1168,52 @@ async function syncResultados() {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
 
+    const setDebug = (msg) => {
+      const el = document.getElementById('sync-status');
+      const elp = document.getElementById('sync-status-pub');
+      if (el) el.textContent = msg;
+      if (elp) elp.textContent = msg;
+      console.log('[Sync]', msg);
+    };
+
     const fetchESPN = async (date) => {
       const url = ESPN_API + (date ? `?dates=${date}` : '');
-      // Intentar directo primero (ESPN permite CORS desde browsers)
+      setDebug(`Consultando ESPN: ${url.slice(-20)}…`);
+      // Intentar directo primero
       try {
         const r = await fetch(url, { signal: controller.signal });
-        if (r.ok) return r.json();
-      } catch(_) {}
+        if (r.ok) { setDebug('ESPN directo OK'); return r.json(); }
+        setDebug(`ESPN directo: ${r.status}`);
+      } catch(e) { setDebug(`ESPN directo falló: ${e.message.slice(0,40)}`); }
       // Fallback: proxy CORS
       const proxy = 'https://corsproxy.io/?url=' + encodeURIComponent(url);
-      const r2 = await fetch(proxy, { signal: controller.signal });
-      if (!r2.ok) throw new Error(`HTTP ${r2.status}`);
-      return r2.json();
+      setDebug('Intentando proxy CORS…');
+      try {
+        const r2 = await fetch(proxy, { signal: controller.signal });
+        if (r2.ok) { setDebug('Proxy OK'); return r2.json(); }
+        setDebug(`Proxy error: ${r2.status}`);
+        throw new Error(`HTTP ${r2.status}`);
+      } catch(e2) {
+        setDebug(`Proxy falló: ${e2.message.slice(0,40)}`);
+        throw e2;
+      }
     };
 
     const [todayData, ayerData] = await Promise.all([
-      fetchESPN(fmtESPN(now)).catch(()=>({events:[]})),
-      fetchESPN(fmtESPN(ayer)).catch(()=>({events:[]})),
+      fetchESPN(fmtESPN(now)).catch(e=>{ console.error('today failed',e); return {events:[]}; }),
+      fetchESPN(fmtESPN(ayer)).catch(e=>{ console.error('ayer failed',e); return {events:[]}; }),
     ]);
     clearTimeout(timeout);
 
-    // Combinar eventos de hoy y ayer
     const allEvents = [...(ayerData.events||[]), ...(todayData.events||[])];
+    setDebug(`ESPN: ${allEvents.length} evento(s) recibidos hoy/ayer`);
+    // Log team names for debugging mismatches
+    allEvents.forEach(ev => {
+      const comp = ev.competitions?.[0];
+      const sts = comp?.status?.type?.name || '?';
+      const teams = (comp?.competitors||[]).map(c=>c.team?.displayName||'?').join(' vs ');
+      console.log(`[ESPN] ${sts}: ${teams} | score: ${(comp?.competitors||[]).map(c=>c.score||'?').join('-')}`);
+    });
 
     const newResults = { ...realResults };
     let updated = 0;
