@@ -1,0 +1,233 @@
+name: Sync Mundial Scores
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # Cada 5 minutos
+  workflow_dispatch:          # También se puede lanzar manualmente
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync ESPN → Firebase
+        run: node << 'ENDSCRIPT'
+
+const https = require('https');
+
+// ── CONFIG ────────────────────────────────────────────────
+const FIREBASE_PROJECT = 'quiniela-2026-f270d';
+const FIREBASE_API_KEY  = 'AIzaSyCPWIL-mqKl5cn7zg9ozSH4F_0-SlgSZHE';
+const SETTINGS_PATH     = 'quiniela_config/control';
+
+const TEAM_MAP = {
+  "México":"Mexico","Sudáfrica":"South Africa","Corea del Sur":"South Korea",
+  "Chequia":"Czech Republic","Canadá":"Canada","Bosnia y Herzegovina":"Bosnia",
+  "Qatar":"Qatar","Suiza":"Switzerland","Brasil":"Brazil","Marruecos":"Morocco",
+  "Haití":"Haiti","Escocia":"Scotland","Estados Unidos":"United States",
+  "Paraguay":"Paraguay","Australia":"Australia","Turquía":"Turkey",
+  "Alemania":"Germany","Curazao":"Curacao","Costa de Marfil":"Ivory Coast",
+  "Ecuador":"Ecuador","Países Bajos":"Netherlands","Japón":"Japan",
+  "Suecia":"Sweden","Túnez":"Tunisia","Bélgica":"Belgium","Egipto":"Egypt",
+  "Irán":"Iran","Nueva Zelanda":"New Zealand","España":"Spain",
+  "Cabo Verde":"Cape Verde","Arabia Saudita":"Saudi Arabia","Uruguay":"Uruguay",
+  "Francia":"France","Senegal":"Senegal","Noruega":"Norway","Iraq":"Iraq",
+  "Argentina":"Argentina","Argelia":"Algeria","Austria":"Austria",
+  "Jordania":"Jordan","Portugal":"Portugal","DR Congo":"DR Congo",
+  "Uzbekistán":"Uzbekistan","Colombia":"Colombia","Inglaterra":"England",
+  "Croacia":"Croatia","Ghana":"Ghana","Panamá":"Panama",
+};
+
+// MATCHES del Mundial 2026 (local, visita, id)
+const MATCHES = [
+  [1,"México","Sudáfrica"],[2,"Corea del Sur","Chequia"],
+  [3,"Canadá","Bosnia y Herzegovina"],[4,"Qatar","Suiza"],
+  [5,"Brasil","Marruecos"],[6,"Haití","Escocia"],
+  [7,"Estados Unidos","Paraguay"],[8,"Australia","Turquía"],
+  [9,"Alemania","Curazao"],[10,"Costa de Marfil","Ecuador"],
+  [11,"Países Bajos","Japón"],[12,"Suecia","Túnez"],
+  [13,"Bélgica","Egipto"],[14,"Irán","Nueva Zelanda"],
+  [15,"España","Cabo Verde"],[16,"Arabia Saudita","Uruguay"],
+  [17,"Francia","Senegal"],[18,"Iraq","Noruega"],
+  [19,"Argentina","Argelia"],[20,"Austria","Jordania"],
+  [21,"Portugal","DR Congo"],[22,"Uzbekistán","Colombia"],
+  [23,"Inglaterra","Croacia"],[24,"Ghana","Panamá"],
+  [25,"Chequia","Sudáfrica"],[26,"Canadá","Qatar"],
+  [27,"Escocia","Marruecos"],[28,"Brasil","Haití"],
+  [29,"Estados Unidos","Australia"],[30,"Turquía","Paraguay"],
+  [31,"Alemania","Costa de Marfil"],[32,"Ecuador","Curazao"],
+  [33,"Países Bajos","Suecia"],[34,"Túnez","Japón"],
+  [35,"Bélgica","Irán"],[36,"Nueva Zelanda","Egipto"],
+  [37,"España","Arabia Saudita"],[38,"Uruguay","Cabo Verde"],
+  [39,"Argentina","Austria"],[40,"Francia","Iraq"],
+  [41,"Noruega","Senegal"],[42,"Jordania","Argelia"],
+  [43,"Portugal","Uzbekistán"],[44,"Inglaterra","Ghana"],
+  [45,"Panamá","Croacia"],[46,"Colombia","DR Congo"],
+  [47,"Suiza","Canadá"],[48,"Bosnia y Herzegovina","Qatar"],
+  [49,"Escocia","Brasil"],[50,"Marruecos","Haití"],
+  [51,"Chequia","México"],[52,"Sudáfrica","Corea del Sur"],
+  [53,"Ecuador","Alemania"],[54,"Curazao","Costa de Marfil"],
+  [55,"Túnez","Países Bajos"],[56,"Japón","Suecia"],
+  [57,"Turquía","Estados Unidos"],[58,"Paraguay","Australia"],
+  [59,"Noruega","Francia"],[60,"Senegal","Iraq"],
+  [61,"Uruguay","España"],[62,"Cabo Verde","Arabia Saudita"],
+  [63,"Nueva Zelanda","Bélgica"],[64,"Egipto","Irán"],
+  [65,"Panamá","Inglaterra"],[66,"Croacia","Ghana"],
+  [67,"Colombia","Portugal"],[68,"DR Congo","Uzbekistán"],
+  [69,"Jordania","Argentina"],[70,"Argelia","Austria"],
+  [71,"Suiza","Bosnia y Herzegovina"],[72,"México","Corea del Sur"],
+];
+
+// ── HELPERS ───────────────────────────────────────────────
+function fetchUrl(url) {
+  return new Promise((resolve, reject) => {
+    https.get(url, res => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); }
+        catch(e) { reject(new Error('JSON inválido: ' + data.slice(0,100))); }
+      });
+    }).on('error', reject);
+  });
+}
+
+function firestoreRequest(method, path, body) {
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/(default)/documents/${path}?key=${FIREBASE_API_KEY}`;
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const options = {
+      hostname: parsed.hostname,
+      path: parsed.pathname + parsed.search,
+      method,
+      headers: { 'Content-Type': 'application/json' },
+    };
+    const req = https.request(options, res => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); }
+        catch(e) { resolve({}); }
+      });
+    });
+    req.on('error', reject);
+    if (body) req.write(JSON.stringify(body));
+    req.end();
+  });
+}
+
+// Convierte valor JS a formato Firestore
+function toFirestore(val) {
+  if (val === null || val === undefined) return { nullValue: null };
+  if (typeof val === 'boolean') return { booleanValue: val };
+  if (typeof val === 'number') return { integerValue: String(val) };
+  if (typeof val === 'string') return { stringValue: val };
+  if (typeof val === 'object') {
+    const fields = {};
+    for (const [k, v] of Object.entries(val)) fields[k] = toFirestore(v);
+    return { mapValue: { fields } };
+  }
+  return { stringValue: String(val) };
+}
+
+// Lee el documento de Firebase
+async function getFirebaseDoc() {
+  const doc = await firestoreRequest('GET', SETTINGS_PATH, null);
+  const fields = doc.fields || {};
+  const realResults = {};
+  if (fields.realResults?.mapValue?.fields) {
+    for (const [k, v] of Object.entries(fields.realResults.mapValue.fields)) {
+      const f = v.mapValue?.fields || {};
+      realResults[k] = {
+        gl: f.gl?.stringValue ?? '',
+        gv: f.gv?.stringValue ?? '',
+        final: f.final?.booleanValue ?? undefined,
+      };
+    }
+  }
+  return realResults;
+}
+
+// ── MAIN ──────────────────────────────────────────────────
+async function main() {
+  const now   = new Date();
+  const ayer  = new Date(now); ayer.setDate(now.getDate() - 1);
+  const fmt   = d => d.toISOString().slice(0,10).replace(/-/g,'');
+
+  const ESPN  = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
+
+  console.log('Obteniendo partidos de ESPN…');
+  const [today, yesterday] = await Promise.all([
+    fetchUrl(`${ESPN}?dates=${fmt(now)}`).catch(()=>({events:[]})),
+    fetchUrl(`${ESPN}?dates=${fmt(ayer)}`).catch(()=>({events:[]})),
+  ]);
+
+  const allEvents = [...(yesterday.events||[]), ...(today.events||[])];
+  console.log(`ESPN: ${allEvents.length} evento(s) encontrados`);
+
+  if (!allEvents.length) { console.log('Sin datos, saliendo.'); return; }
+
+  // Leer estado actual de Firebase
+  const currentResults = await getFirebaseDoc();
+  const newResults = { ...currentResults };
+  let updated = 0;
+
+  const LIVE_ST   = ['STATUS_IN_PROGRESS','STATUS_HALFTIME'];
+  const FINISH_ST = ['STATUS_FINAL'];
+
+  for (const event of allEvents) {
+    const comp    = event.competitions?.[0];
+    const status  = comp?.status?.type?.name || '';
+    const isLive  = LIVE_ST.includes(status);
+    const isFinal = FINISH_ST.includes(status) || comp?.status?.type?.completed === true;
+    if (!isLive && !isFinal) continue;
+
+    const home = (comp?.competitors||[]).find(c=>c.homeAway==='home');
+    const away = (comp?.competitors||[]).find(c=>c.homeAway==='away');
+    if (!home || !away) continue;
+
+    const homeAPI = home.team?.displayName || home.team?.name || '';
+    const awayAPI = away.team?.displayName || away.team?.name || '';
+    const hs = parseInt(home.score||'0'), as_ = parseInt(away.score||'0');
+    if (isNaN(hs)||isNaN(as_)) continue;
+
+    console.log(`  ${status}: ${homeAPI} ${hs}-${as_} ${awayAPI}`);
+
+    const match = MATCHES.find(([,l,v]) => {
+      const mh = TEAM_MAP[l]||l, ma = TEAM_MAP[v]||v;
+      return (mh===homeAPI&&ma===awayAPI)||(mh===awayAPI&&ma===homeAPI);
+    });
+    if (!match) { console.log(`  ⚠️ Sin mapeo: ${homeAPI} vs ${awayAPI}`); continue; }
+
+    const [id, local] = match;
+    const mh = TEAM_MAP[local]||local;
+    const gl = String(mh===homeAPI ? hs : as_);
+    const gv = String(mh===homeAPI ? as_ : hs);
+    const key = String(id);
+    const prev = newResults[key];
+
+    if (prev?.final === true && !isFinal) continue; // no bajar de final a en vivo
+    if (!prev || prev.gl!==gl || prev.gv!==gv || prev.final!==isFinal) {
+      newResults[key] = { gl, gv, final: isFinal };
+      updated++;
+      console.log(`  ✅ Partido ${id} actualizado: ${gl}-${gv} (final:${isFinal})`);
+    }
+  }
+
+  if (updated === 0) { console.log('Sin cambios.'); }
+
+  // Guardar siempre (para actualizar lastApiSync)
+  const body = {
+    fields: {
+      realResults: toFirestore(newResults),
+      lastApiSync: toFirestore(Date.now()),
+      updatedAt:   toFirestore(Date.now()),
+    }
+  };
+  const patchUrl = `${SETTINGS_PATH}?key=${FIREBASE_API_KEY}&updateMask.fieldPaths=realResults&updateMask.fieldPaths=lastApiSync&updateMask.fieldPaths=updatedAt`;
+  await firestoreRequest('PATCH', patchUrl, body);
+  console.log(`✅ Firebase actualizado (${updated} cambio(s))`);
+}
+
+main().catch(e => { console.error('Error:', e.message); process.exit(1); });
+
+ENDSCRIPT
