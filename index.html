@@ -680,23 +680,25 @@ const DATE_MAP = {};
 //  Registro en: https://www.football-data.org/client/register
 //  Pega tu API key abajo (es gratuita)
 // ═══════════════════════════════════════════════════
-const FOOTBALL_API_KEY = "6ea2ec943855488488a516c97b15b053";
+// ESPN API — sin registro ni API key, funciona directo desde el navegador
+const ESPN_API = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard";
 
 // Mapeo: nombres en español → nombres en inglés de la API
+// Mapeo español → nombres exactos en API-Football (RapidAPI)
 const TEAM_MAP = {
-  "México":"Mexico","Sudáfrica":"South Africa","Corea del Sur":"Korea Republic",
-  "Chequia":"Czechia","Canadá":"Canada","Bosnia y Herzegovina":"Bosnia and Herzegovina",
+  "México":"Mexico","Sudáfrica":"South Africa","Corea del Sur":"South Korea",
+  "Chequia":"Czech Republic","Canadá":"Canada","Bosnia y Herzegovina":"Bosnia",
   "Qatar":"Qatar","Suiza":"Switzerland","Brasil":"Brazil","Marruecos":"Morocco",
-  "Haití":"Haiti","Escocia":"Scotland","Estados Unidos":"USA",
+  "Haití":"Haiti","Escocia":"Scotland","Estados Unidos":"United States",
   "Paraguay":"Paraguay","Australia":"Australia","Turquía":"Turkey",
-  "Alemania":"Germany","Curazao":"Curaçao","Costa de Marfil":"Ivory Coast",
+  "Alemania":"Germany","Curazao":"Curacao","Costa de Marfil":"Ivory Coast",
   "Ecuador":"Ecuador","Países Bajos":"Netherlands","Japón":"Japan",
   "Suecia":"Sweden","Túnez":"Tunisia","Bélgica":"Belgium","Egipto":"Egypt",
   "Irán":"Iran","Nueva Zelanda":"New Zealand","España":"Spain",
   "Cabo Verde":"Cape Verde","Arabia Saudita":"Saudi Arabia","Uruguay":"Uruguay",
   "Francia":"France","Senegal":"Senegal","Noruega":"Norway","Iraq":"Iraq",
   "Argentina":"Argentina","Argelia":"Algeria","Austria":"Austria",
-  "Jordania":"Jordan","Portugal":"Portugal","DR Congo":"Congo DR",
+  "Jordania":"Jordan","Portugal":"Portugal","DR Congo":"DR Congo",
   "Uzbekistán":"Uzbekistan","Colombia":"Colombia","Inglaterra":"England",
   "Croacia":"Croatia","Ghana":"Ghana","Panamá":"Panama",
 };
@@ -744,7 +746,8 @@ const AV_COLORS = [
 let parts = [], me = null, isAdmin = sessionStorage.getItem("qm26_admin") === "1", showPublicPicks = DEFAULT_SHOW_PUBLIC_PICKS;
 let selectedExportIds = new Set();
 let realResults = {}; // {matchId: {gl, gv, final}} resultados reales
-let hasUnsavedChanges = false; // declarado temprano para evitar TDZ
+let hasUnsavedChanges = false; // declarado temprano
+let lastApiSync = 0; // timestamp del último sync con la API para evitar TDZ
 
 function docIdFromName(name) {
   return name
@@ -1154,67 +1157,81 @@ async function saveResultados() {
 //  SYNC DE RESULTADOS DESDE INTERNET
 // ═══════════════════════════════════════════════════
 async function syncResultados() {
-  if (!FOOTBALL_API_KEY || FOOTBALL_API_KEY === 'TU_API_KEY_AQUI') return;
   updateSyncStatus('syncing');
   try {
-    // Llamada optimizada: solo partidos recientes (hoy + ayer) en lugar de los 72.
-    // Esto reduce el payload de ~72 partidos a ~6 por llamada.
+    // ESPN API — gratuita, sin registro ni API key
+    // Consultamos hoy y ayer para no perder partidos tardíos
     const now = new Date();
     const ayer = new Date(now); ayer.setDate(now.getDate() - 1);
-    const fmt = d => d.toISOString().slice(0, 10); // yyyy-MM-dd
-    const apiUrl = `https://api.football-data.org/v4/competitions/WC/matches?dateFrom=${fmt(ayer)}&dateTo=${fmt(now)}`;
-    const proxyUrl = 'https://corsproxy.io/?url=' + encodeURIComponent(apiUrl);
+    const fmtESPN = d => d.toISOString().slice(0,10).replace(/-/g,''); // yyyyMMdd
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
-    const res = await fetch(proxyUrl, {
-      headers: { 'X-Auth-Token': FOOTBALL_API_KEY },
-      signal: controller.signal
-    });
+
+    const fetchESPN = async (date) => {
+      const url = ESPN_API + (date ? `?dates=${date}` : '');
+      // Intentar directo primero (ESPN permite CORS desde browsers)
+      try {
+        const r = await fetch(url, { signal: controller.signal });
+        if (r.ok) return r.json();
+      } catch(_) {}
+      // Fallback: proxy CORS
+      const proxy = 'https://corsproxy.io/?url=' + encodeURIComponent(url);
+      const r2 = await fetch(proxy, { signal: controller.signal });
+      if (!r2.ok) throw new Error(`HTTP ${r2.status}`);
+      return r2.json();
+    };
+
+    const [todayData, ayerData] = await Promise.all([
+      fetchESPN(fmtESPN(now)).catch(()=>({events:[]})),
+      fetchESPN(fmtESPN(ayer)).catch(()=>({events:[]})),
+    ]);
     clearTimeout(timeout);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+
+    // Combinar eventos de hoy y ayer
+    const allEvents = [...(ayerData.events||[]), ...(todayData.events||[])];
 
     const newResults = { ...realResults };
     let updated = 0;
-
     let liveCount = 0;
-    for (const apiMatch of (data.matches || [])) {
-      const st = apiMatch.status;
-      if (!['FINISHED','IN_PLAY','PAUSED'].includes(st)) continue;
 
-      // Obtener marcador según estado
-      let hs, as_;
-      if (st === 'FINISHED') {
-        hs = apiMatch.score?.fullTime?.home;
-        as_ = apiMatch.score?.fullTime?.away;
-      } else {
-        // En vivo: intentar fullTime (marcador corriendo), luego halfTime
-        hs = apiMatch.score?.fullTime?.home ?? apiMatch.score?.halfTime?.home;
-        as_ = apiMatch.score?.fullTime?.away ?? apiMatch.score?.halfTime?.away;
-        if (st === 'IN_PLAY') liveCount++;
-      }
-      if (hs === null || hs === undefined || as_ === null || as_ === undefined) continue;
+    for (const event of allEvents) {
+      const comp = event.competitions?.[0];
+      if (!comp) continue;
 
-      // Buscar el partido correspondiente en nuestros MATCHES
+      const statusName = comp.status?.type?.name || '';
+      // ESPN status: STATUS_SCHEDULED, STATUS_IN_PROGRESS, STATUS_HALFTIME, STATUS_FINAL
+      const isLive  = ['STATUS_IN_PROGRESS','STATUS_HALFTIME'].includes(statusName);
+      const isFinal = comp.status?.type?.completed === true || statusName === 'STATUS_FINAL';
+      if (!isLive && !isFinal) continue;
+      if (isLive) liveCount++;
+
+      const competitors = comp.competitors || [];
+      const home = competitors.find(c => c.homeAway === 'home');
+      const away = competitors.find(c => c.homeAway === 'away');
+      if (!home || !away) continue;
+
+      const homeAPI = home.team?.displayName || home.team?.name || '';
+      const awayAPI = away.team?.displayName || away.team?.name || '';
+      const hs = parseInt(home.score || '0');
+      const as_ = parseInt(away.score || '0');
+      if (isNaN(hs) || isNaN(as_)) continue;
+
+      // Buscar el partido en nuestros MATCHES
       const match = MATCHES.find(m => {
-        const mh = TEAM_MAP[m.local]   || m.local;
-        const ma = TEAM_MAP[m.visita]  || m.visita;
-        const ah = apiMatch.homeTeam?.name || '';
-        const aa = apiMatch.awayTeam?.name || '';
-        return (mh === ah && ma === aa) || (mh === aa && ma === ah);
+        const mh = TEAM_MAP[m.local]  || m.local;
+        const ma = TEAM_MAP[m.visita] || m.visita;
+        return (mh === homeAPI && ma === awayAPI) ||
+               (mh === awayAPI && ma === homeAPI);
       });
       if (!match) continue;
 
-      // Ajustar si el API invierte local/visita
       const mh = TEAM_MAP[match.local] || match.local;
-      const ah = apiMatch.homeTeam?.name || '';
-      let gl = String(mh === ah ? hs : as_);
-      let gv = String(mh === ah ? as_ : hs);
-      const isFinal = st === 'FINISHED'; // ¿Resultado definitivo?
+      const gl = String(mh === homeAPI ? hs : as_);
+      const gv = String(mh === homeAPI ? as_ : hs);
 
       const key = String(match.id);
       const prev = newResults[key];
-      // NUNCA sobrescribir un resultado que el admin ya marcó como final
       if (prev && prev.final === true && !isFinal) continue;
       if (!prev || prev.gl !== gl || prev.gv !== gv || prev.final !== isFinal) {
         newResults[key] = { gl, gv, final: isFinal };
@@ -1267,7 +1284,7 @@ function updateSyncStatus(state, count, live) {
 
 function startAutoSync() {
   // Solo un sync inicial al cargar para reflejar el estado actual
-  if (!FOOTBALL_API_KEY || FOOTBALL_API_KEY === 'TU_API_KEY_AQUI') {
+  if (false) { // ESPN API no necesita key
     updateSyncStatus('nokey');
     return;
   }
@@ -1308,7 +1325,7 @@ function buildRanking() {
   const el = document.getElementById('ranking-list');
 
   // Botón de actualización manual visible para todos (dentro de la lista, sin duplicar)
-  const syncKey = FOOTBALL_API_KEY && FOOTBALL_API_KEY !== 'TU_API_KEY_AQUI';
+  const syncKey = true; // ESPN API siempre activa
   const syncBar = syncKey ? `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:.85rem;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:.65rem 1rem;box-shadow:var(--shadow)">
       <div style="flex:1;font-size:11px" id="sync-status-pub">Los resultados llegan automáticamente · toca para refrescar</div>
