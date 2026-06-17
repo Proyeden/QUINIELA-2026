@@ -14,7 +14,7 @@ const MATCHES = [
   [13,"Belgium","Egypt"],[14,"Iran","New Zealand"],
   [15,"Spain","Cape Verde"],[16,"Saudi Arabia","Uruguay"],
   [17,"France","Senegal"],[18,"Iraq","Norway"],
-  [19,"Argentina","Algeria"],[20,"Austria","Jordan"],
+  [19,"Argentina","Argelia"],[20,"Austria","Jordan"],
   [21,"Portugal","DR Congo"],[22,"Uzbekistan","Colombia"],
   [23,"England","Croatia"],[24,"Ghana","Panama"],
   [25,"Czech Republic","South Africa"],[26,"Canada","Qatar"],
