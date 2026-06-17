@@ -118,7 +118,7 @@ async function main() {
   const nr  = Object.assign({}, cur);
   let upd   = 0;
   const LIVE = ['STATUS_IN_PROGRESS', 'STATUS_HALFTIME'];
-  const DONE = ['STATUS_FINAL'];
+  const DONE = ['STATUS_FINAL', 'STATUS_FULL_TIME', 'STATUS_FULL_PEN', 'STATUS_FULL_ET'];
 
   for (const ev of all) {
     const comp = ev.competitions && ev.competitions[0];
