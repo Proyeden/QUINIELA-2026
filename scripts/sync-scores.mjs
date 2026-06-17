@@ -151,30 +151,71 @@ async function main() {
 
     console.log('  ' + st + ': ' + hN + ' ' + hs + '-' + as_ + ' ' + aN);
 
+    // ESPN a veces devuelve nombres en español — normalizar antes de buscar
+    // Todas las variantes posibles de nombres que ESPN puede usar
     const ESPN_NAMES = {
-      "Argelia":"Algeria","Argérie":"Algeria","Chequia":"Czech Republic",
-      "Corea del Sur":"South Korea","Países Bajos":"Netherlands",
-      "Alemania":"Germany","Curazao":"Curacao","Costa de Marfil":"Ivory Coast",
-      "Suecia":"Sweden","Túnez":"Tunisia","Bélgica":"Belgium","Egipto":"Egypt",
-      "Irán":"Iran","Nueva Zelanda":"New Zealand","España":"Spain",
-      "Cabo Verde":"Cape Verde","Arabia Saudita":"Saudi Arabia",
-      "Francia":"France","Noruega":"Norway","Jordania":"Jordan",
-      "Uzbekistán":"Uzbekistan","Inglaterra":"England","Croacia":"Croatia",
-      "Panamá":"Panama","Canadá":"Canada","Suiza":"Switzerland",
-      "Brasil":"Brazil","Marruecos":"Morocco","Haití":"Haiti","Escocia":"Scotland",
-      "Estados Unidos":"United States","Australia":"Australia","Turquía":"Turkey",
-      "Ecuador":"Ecuador","Japón":"Japan","México":"Mexico",
-      "Sudáfrica":"South Africa","Senegal":"Senegal","Irak":"Iraq",
+      // Español → inglés
+      "Argelia":"Algeria","Argérie":"Algeria",
+      "Chequia":"Czech Republic","República Checa":"Czech Republic",
+      "Corea del Sur":"South Korea","Corea":"South Korea","Korea Republic":"South Korea",
+      "Países Bajos":"Netherlands","Holanda":"Netherlands","Holland":"Netherlands",
+      "Alemania":"Germany",
+      "Curazao":"Curacao","Curaçao":"Curacao",
+      "Costa de Marfil":"Ivory Coast","Côte d'Ivoire":"Ivory Coast","Cote d'Ivoire":"Ivory Coast",
+      "Suecia":"Sweden",
+      "Túnez":"Tunisia","Tunez":"Tunisia",
+      "Bélgica":"Belgium","Belgica":"Belgium",
+      "Egipto":"Egypt",
+      "Irán":"Iran","Iran Islamic Republic":"Iran",
+      "Nueva Zelanda":"New Zealand",
+      "España":"Spain",
+      "Cabo Verde":"Cape Verde","Cape Verde Islands":"Cape Verde",
+      "Arabia Saudita":"Saudi Arabia","Saudi Arabia":"Saudi Arabia",
+      "Francia":"France",
+      "Noruega":"Norway",
+      "Jordania":"Jordan",
+      "Uzbekistán":"Uzbekistan","Uzbekistán":"Uzbekistan",
+      "Inglaterra":"England",
+      "Croacia":"Croatia",
+      "Panamá":"Panama",
+      "Canadá":"Canada",
+      "Suiza":"Switzerland",
+      "Brasil":"Brazil",
+      "Marruecos":"Morocco",
+      "Haití":"Haiti",
+      "Escocia":"Scotland",
+      "Estados Unidos":"United States","USA":"United States","US":"United States",
+      "Turquía":"Turkey","Turkey":"Turkey",
+      "Ecuador":"Ecuador",
+      "Japón":"Japan",
+      "México":"Mexico",
+      "Sudáfrica":"South Africa","South Africa":"South Africa",
+      "Irak":"Iraq","Irak":"Iraq",
+      "Bosnia y Herzegovina":"Bosnia","Bosnia Herzegovina":"Bosnia","Bosnia & Herzegovina":"Bosnia",
+      "República Democrática del Congo":"DR Congo","Congo DR":"DR Congo","DR Congo":"DR Congo","Congo, DR":"DR Congo",
+      "Senegal":"Senegal",
+      "Ghana":"Ghana",
+      "Portugal":"Portugal",
+      "Colombia":"Colombia",
+      "Australia":"Australia",
+      "Qatar":"Qatar","Catar":"Qatar",
+      "Suecia":"Sweden",
     };
     const normHN = ESPN_NAMES[hN] || hN;
     const normAN = ESPN_NAMES[aN] || aN;
-    const match = MATCHES.find(m => (m[1]===normHN && m[2]===normAN) || (m[1]===normAN && m[2]===normHN));
+    // Buscar por nombre normalizado O por nombre original (por si ESPN ya usa el nombre correcto)
+    const match = MATCHES.find(m =>
+      (m[1]===normHN && m[2]===normAN) ||
+      (m[1]===normAN && m[2]===normHN) ||
+      (m[1]===hN && m[2]===aN) ||
+      (m[1]===aN && m[2]===hN)
+    );
     if (!match) { console.log('  Sin mapeo: ' + hN + '(' + normHN + ') vs ' + aN + '(' + normAN + ')'); continue; }
 
     const id    = match[0];
     const local = match[1];
-    const gl  = String(local === normHN ? hs : as_);
-    const gv  = String(local === normHN ? as_ : hs);
+    const gl  = String(local === hN ? hs : as_);
+    const gv  = String(local === hN ? as_ : hs);
     const key = String(id);
     const prev = nr[key];
     if (prev && prev.final === true && !isFinal) continue;
