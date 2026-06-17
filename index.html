@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -375,19 +376,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--light);color:var(--text);
 .rank-pts-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-top:1px;text-align:right}
 .ranking-mode-note{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:.85rem;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;box-shadow:var(--shadow)}
 .ranking-mode-note.live{background:#e7f8ee;border-color:#a7d7b8;color:#176b3a;font-weight:600}
-
-/* ── MARCADOR EN CARTELERA ── */
-.upcoming-score{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:60px}
-.upcoming-score-nums{font-family:'Bebas Neue',sans-serif;font-size:28px;font-weight:800;letter-spacing:2px;line-height:1;color:var(--navy)}
-.upcoming-score-nums.live{color:var(--red);animation:scorePulse 2s infinite}
-.upcoming-score-nums.final{color:var(--green)}
-@keyframes scorePulse{0%,100%{opacity:1}50%{opacity:.6}}
-.upcoming-score-badge{font-size:8px;font-weight:800;letter-spacing:1px;text-transform:uppercase;padding:2px 6px;border-radius:99px}
-.upcoming-score-badge.live{background:var(--red);color:#fff}
-.upcoming-score-badge.final{background:var(--green);color:#fff}
-.upcoming-refresh-btn{background:var(--navy3);color:#fff;border:none;border-radius:var(--radius-sm);padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px;transition:.15s}
-.upcoming-refresh-btn:hover{background:var(--red)}
-.upcoming-refresh-btn:disabled{opacity:.5;cursor:default}
 </style>
 </head>
 <body>
@@ -570,96 +558,60 @@ body{font-family:'DM Sans',sans-serif;background:var(--light);color:var(--text);
 // ═══════════════════════════════════════════════════
 const G = {
   A:{c:"#1565C0",l:"#EBF5FB",t:"México · Sudáfrica · Corea del Sur · Chequia",
-     m:[["México","🇲🇽","Sudáfrica","🇿🇦","11 jun","13:00","FOX · C11"],
-        ["Corea del Sur","🇰🇷","Chequia","🇨🇿","11 jun","20:00","Tigo"],
-        ["Chequia","🇨🇿","Sudáfrica","🇿🇦","18 jun","10:00","FOX · C11"],
-        ["México","🇲🇽","Corea del Sur","🇰🇷","18 jun","19:00","FOX · C11"],
-        ["Chequia","🇨🇿","México","🇲🇽","24 jun","19:00","FOX · C11"],
-        ["Sudáfrica","🇿🇦","Corea del Sur","🇰🇷","24 jun","19:00","FOX · C13"]]},
+     m:[["México","🇲🇽","Sudáfrica","🇿🇦","11 jun"],["Corea del Sur","🇰🇷","Chequia","🇨🇿","11 jun"],
+        ["Chequia","🇨🇿","Sudáfrica","🇿🇦","18 jun"],["México","🇲🇽","Corea del Sur","🇰🇷","18 jun"],
+        ["Chequia","🇨🇿","México","🇲🇽","24 jun"],["Sudáfrica","🇿🇦","Corea del Sur","🇰🇷","24 jun"]]},
   B:{c:"#6A1B9A",l:"#F3E5F5",t:"Canadá · Suiza · Qatar · Bosnia y Herzegovina",
-     m:[["Canadá","🇨🇦","Bosnia y Herzegovina","🇧🇦","12 jun","13:00","FOX · C11"],
-        ["Qatar","🇶🇦","Suiza","🇨🇭","13 jun","13:00","FOX · C7"],
-        ["Suiza","🇨🇭","Bosnia y Herzegovina","🇧🇦","18 jun","13:00","Tigo"],
-        ["Canadá","🇨🇦","Qatar","🇶🇦","18 jun","16:00","FOX · C11"],
-        ["Suiza","🇨🇭","Canadá","🇨🇦","24 jun","13:00","FOX · C11"],
-        ["Bosnia y Herzegovina","🇧🇦","Qatar","🇶🇦","24 jun","13:00","FOX · C13"]]},
+     m:[["Canadá","🇨🇦","Bosnia y Herzegovina","🇧🇦","12 jun"],["Qatar","🇶🇦","Suiza","🇨🇭","13 jun"],
+        ["Suiza","🇨🇭","Bosnia y Herzegovina","🇧🇦","18 jun"],["Canadá","🇨🇦","Qatar","🇶🇦","18 jun"],
+        ["Suiza","🇨🇭","Canadá","🇨🇦","24 jun"],["Bosnia y Herzegovina","🇧🇦","Qatar","🇶🇦","24 jun"]]},
   C:{c:"#2E7D32",l:"#E8F5E9",t:"Brasil · Marruecos · Haití · Escocia",
-     m:[["Brasil","🇧🇷","Marruecos","🇲🇦","13 jun","16:00","Tigo"],
-        ["Haití","🇭🇹","Escocia","🏴󠁧󠁢󠁳󠁣󠁴󠁿","13 jun","19:00","FOX · C11"],
-        ["Escocia","🏴󠁧󠁢󠁳󠁣󠁴󠁿","Marruecos","🇲🇦","19 jun","16:00","FOX · C11"],
-        ["Brasil","🇧🇷","Haití","🇭🇹","19 jun","18:30","FOX · C11"],
-        ["Escocia","🏴󠁧󠁢󠁳󠁣󠁴󠁿","Brasil","🇧🇷","24 jun","16:00","Tigo"],
-        ["Marruecos","🇲🇦","Haití","🇭🇹","24 jun","16:00","FOX · C11"]]},
+     m:[["Brasil","🇧🇷","Marruecos","🇲🇦","13 jun"],["Haití","🇭🇹","Escocia","🏴󠁧󠁢󠁳󠁣󠁴󠁿","13 jun"],
+        ["Escocia","🏴󠁧󠁢󠁳󠁣󠁴󠁿","Marruecos","🇲🇦","19 jun"],["Brasil","🇧🇷","Haití","🇭🇹","19 jun"],
+        ["Escocia","🏴󠁧󠁢󠁳󠁣󠁴󠁿","Brasil","🇧🇷","24 jun"],["Marruecos","🇲🇦","Haití","🇭🇹","24 jun"]]},
   D:{c:"#BF360C",l:"#FBE9E7",t:"Estados Unidos · Paraguay · Australia · Turquía",
-     m:[["Estados Unidos","🇺🇸","Paraguay","🇵🇾","12 jun","19:00","Tigo"],
-        ["Australia","🇦🇺","Turquía","🇹🇷","13 jun","22:00","FOX · C7"],
-        ["Estados Unidos","🇺🇸","Australia","🇦🇺","19 jun","13:00","FOX · C11"],
-        ["Turquía","🇹🇷","Paraguay","🇵🇾","19 jun","21:00","FOX · C11"],
-        ["Turquía","🇹🇷","Estados Unidos","🇺🇸","25 jun","20:00","FOX · C11"],
-        ["Paraguay","🇵🇾","Australia","🇦🇺","25 jun","20:00","FOX · C3"]]},
+     m:[["Estados Unidos","🇺🇸","Paraguay","🇵🇾","12 jun"],["Australia","🇦🇺","Turquía","🇹🇷","13 jun"],
+        ["Estados Unidos","🇺🇸","Australia","🇦🇺","19 jun"],["Turquía","🇹🇷","Paraguay","🇵🇾","19 jun"],
+        ["Turquía","🇹🇷","Estados Unidos","🇺🇸","25 jun"],["Paraguay","🇵🇾","Australia","🇦🇺","25 jun"]]},
   E:{c:"#B71C1C",l:"#FFEBEE",t:"Alemania · Curazao · Costa de Marfil · Ecuador",
-     m:[["Alemania","🇩🇪","Curazao","🇨🇼","14 jun","11:00","Tigo"],
-        ["Costa de Marfil","🇨🇮","Ecuador","🇪🇨","14 jun","17:00","FOX · C7"],
-        ["Alemania","🇩🇪","Costa de Marfil","🇨🇮","20 jun","14:00","FOX · C7"],
-        ["Ecuador","🇪🇨","Curazao","🇨🇼","20 jun","18:00","FOX · C11"],
-        ["Ecuador","🇪🇨","Alemania","🇩🇪","25 jun","14:00","FOX · C11"],
-        ["Curazao","🇨🇼","Costa de Marfil","🇨🇮","25 jun","14:00","FOX · C13"]]},
+     m:[["Alemania","🇩🇪","Curazao","🇨🇼","14 jun"],["Costa de Marfil","🇨🇮","Ecuador","🇪🇨","14 jun"],
+        ["Alemania","🇩🇪","Costa de Marfil","🇨🇮","20 jun"],["Ecuador","🇪🇨","Curazao","🇨🇼","20 jun"],
+        ["Ecuador","🇪🇨","Alemania","🇩🇪","25 jun"],["Curazao","🇨🇼","Costa de Marfil","🇨🇮","25 jun"]]},
   F:{c:"#00695C",l:"#E0F2F1",t:"Países Bajos · Japón · Suecia · Túnez",
-     m:[["Países Bajos","🇳🇱","Japón","🇯🇵","14 jun","14:00","Tigo"],
-        ["Suecia","🇸🇪","Túnez","🇹🇳","14 jun","20:00","FOX · C11"],
-        ["Países Bajos","🇳🇱","Suecia","🇸🇪","20 jun","11:00","Tigo"],
-        ["Túnez","🇹🇳","Japón","🇯🇵","20 jun","22:00","FOX · C11"],
-        ["Japón","🇯🇵","Suecia","🇸🇪","25 jun","17:00","FOX · C13"],
-        ["Túnez","🇹🇳","Países Bajos","🇳🇱","25 jun","17:00","FOX · C11"]]},
+     m:[["Países Bajos","🇳🇱","Japón","🇯🇵","14 jun"],["Suecia","🇸🇪","Túnez","🇹🇳","14 jun"],
+        ["Países Bajos","🇳🇱","Suecia","🇸🇪","20 jun"],["Túnez","🇹🇳","Japón","🇯🇵","20 jun"],
+        ["Japón","🇯🇵","Suecia","🇸🇪","25 jun"],["Túnez","🇹🇳","Países Bajos","🇳🇱","25 jun"]]},
   G:{c:"#4527A0",l:"#EDE7F6",t:"Bélgica · Egipto · Irán · Nueva Zelanda",
-     m:[["Bélgica","🇧🇪","Egipto","🇪🇬","15 jun","13:00","FOX · C11"],
-        ["Irán","🇮🇷","Nueva Zelanda","🇳🇿","15 jun","19:00","FOX · C11"],
-        ["Bélgica","🇧🇪","Irán","🇮🇷","21 jun","13:00","FOX · C7"],
-        ["Nueva Zelanda","🇳🇿","Egipto","🇪🇬","21 jun","19:00","FOX · C11"],
-        ["Egipto","🇪🇬","Irán","🇮🇷","26 jun","21:00","FOX · C3"],
-        ["Nueva Zelanda","🇳🇿","Bélgica","🇧🇪","26 jun","21:00","FOX · C11"]]},
+     m:[["Bélgica","🇧🇪","Egipto","🇪🇬","15 jun"],["Irán","🇮🇷","Nueva Zelanda","🇳🇿","15 jun"],
+        ["Bélgica","🇧🇪","Irán","🇮🇷","21 jun"],["Nueva Zelanda","🇳🇿","Egipto","🇪🇬","21 jun"],
+        ["Egipto","🇪🇬","Irán","🇮🇷","26 jun"],["Nueva Zelanda","🇳🇿","Bélgica","🇧🇪","26 jun"]]},
   H:{c:"#E65100",l:"#FFF3E0",t:"España · Cabo Verde · Arabia Saudita · Uruguay",
-     m:[["España","🇪🇸","Cabo Verde","🇨🇻","15 jun","10:00","Tigo"],
-        ["Arabia Saudita","🇸🇦","Uruguay","🇺🇾","15 jun","16:00","FOX · C11"],
-        ["España","🇪🇸","Arabia Saudita","🇸🇦","21 jun","10:00","Tigo"],
-        ["Uruguay","🇺🇾","Cabo Verde","🇨🇻","21 jun","16:00","Tigo"],
-        ["Cabo Verde","🇨🇻","Arabia Saudita","🇸🇦","26 jun","18:00","FOX · C11"],
-        ["Uruguay","🇺🇾","España","🇪🇸","26 jun","18:00","Tigo"]]},
+     m:[["España","🇪🇸","Cabo Verde","🇨🇻","15 jun"],["Arabia Saudita","🇸🇦","Uruguay","🇺🇾","15 jun"],
+        ["España","🇪🇸","Arabia Saudita","🇸🇦","21 jun"],["Uruguay","🇺🇾","Cabo Verde","🇨🇻","21 jun"],
+        ["Cabo Verde","🇨🇻","Arabia Saudita","🇸🇦","26 jun"],["Uruguay","🇺🇾","España","🇪🇸","26 jun"]]},
   I:{c:"#0D47A1",l:"#E3F2FD",t:"Francia · Senegal · Noruega · Iraq",
-     m:[["Francia","🇫🇷","Senegal","🇸🇳","16 jun","13:00","Tigo"],
-        ["Iraq","🇮🇶","Noruega","🇳🇴","16 jun","16:00","FOX · C11"],
-        ["Francia","🇫🇷","Iraq","🇮🇶","22 jun","15:00","FOX · C11"],
-        ["Noruega","🇳🇴","Senegal","🇸🇳","22 jun","18:00","FOX · C11"],
-        ["Noruega","🇳🇴","Francia","🇫🇷","26 jun","13:00","FOX · C11"],
-        ["Senegal","🇸🇳","Iraq","🇮🇶","26 jun","13:00","FOX · C13"]]},
+     m:[["Francia","🇫🇷","Senegal","🇸🇳","16 jun"],["Iraq","🇮🇶","Noruega","🇳🇴","16 jun"],
+        ["Francia","🇫🇷","Iraq","🇮🇶","22 jun"],["Noruega","🇳🇴","Senegal","🇸🇳","22 jun"],
+        ["Noruega","🇳🇴","Francia","🇫🇷","26 jun"],["Senegal","🇸🇳","Iraq","🇮🇶","26 jun"]]},
   J:{c:"#33691E",l:"#F1F8E9",t:"Argentina · Argelia · Austria · Jordania",
-     m:[["Argentina","🇦🇷","Argelia","🇩🇿","16 jun","19:00","Tigo"],
-        ["Austria","🇦🇹","Jordania","🇯🇴","16 jun","22:00","FOX · C11"],
-        ["Argentina","🇦🇷","Austria","🇦🇹","22 jun","11:00","Tigo"],
-        ["Jordania","🇯🇴","Argelia","🇩🇿","22 jun","21:00","FOX · C11"],
-        ["Argelia","🇩🇿","Austria","🇦🇹","27 jun","20:00","FOX · C13"],
-        ["Jordania","🇯🇴","Argentina","🇦🇷","27 jun","20:00","FOX · C11"]]},
+     m:[["Argentina","🇦🇷","Argelia","🇩🇿","16 jun"],["Austria","🇦🇹","Jordania","🇯🇴","16 jun"],
+        ["Argentina","🇦🇷","Austria","🇦🇹","22 jun"],["Jordania","🇯🇴","Argelia","🇩🇿","22 jun"],
+        ["Argelia","🇩🇿","Austria","🇦🇹","27 jun"],["Jordania","🇯🇴","Argentina","🇦🇷","27 jun"]]},
   K:{c:"#880E4F",l:"#FCE4EC",t:"Portugal · Colombia · Uzbekistán · DR Congo",
-     m:[["Portugal","🇵🇹","DR Congo","🇨🇩","17 jun","11:00","Tigo"],
-        ["Uzbekistán","🇺🇿","Colombia","🇨🇴","17 jun","20:00","FOX · C11"],
-        ["Portugal","🇵🇹","Uzbekistán","🇺🇿","23 jun","11:00","FOX · C11"],
-        ["Colombia","🇨🇴","DR Congo","🇨🇩","23 jun","20:00","Tigo"],
-        ["Colombia","🇨🇴","Portugal","🇵🇹","27 jun","17:30","Tigo"],
-        ["DR Congo","🇨🇩","Uzbekistán","🇺🇿","27 jun","17:30","FOX · C7"]]},
+     m:[["Portugal","🇵🇹","DR Congo","🇨🇩","17 jun"],["Uzbekistán","🇺🇿","Colombia","🇨🇴","17 jun"],
+        ["Portugal","🇵🇹","Uzbekistán","🇺🇿","23 jun"],["Colombia","🇨🇴","DR Congo","🇨🇩","23 jun"],
+        ["Colombia","🇨🇴","Portugal","🇵🇹","27 jun"],["DR Congo","🇨🇩","Uzbekistán","🇺🇿","27 jun"]]},
   L:{c:"#37474F",l:"#ECEFF1",t:"Inglaterra · Croacia · Ghana · Panamá",
-     m:[["Inglaterra","🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croacia","🇭🇷","17 jun","14:00","Tigo"],
-        ["Ghana","🇬🇭","Panamá","🇵🇦","17 jun","17:00","FOX · C11"],
-        ["Inglaterra","🏴󠁧󠁢󠁥󠁮󠁧󠁿","Ghana","🇬🇭","23 jun","14:00","FOX · C11"],
-        ["Panamá","🇵🇦","Croacia","🇭🇷","23 jun","17:00","FOX · C11"],
-        ["Panamá","🇵🇦","Inglaterra","🏴󠁧󠁢󠁥󠁮󠁧󠁿","27 jun","15:00","FOX · C7"],
-        ["Croacia","🇭🇷","Ghana","🇬🇭","27 jun","15:00","FOX · C11"]]},
+     m:[["Inglaterra","🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croacia","🇭🇷","17 jun"],["Ghana","🇬🇭","Panamá","🇵🇦","17 jun"],
+        ["Inglaterra","🏴󠁧󠁢󠁥󠁮󠁧󠁿","Ghana","🇬🇭","23 jun"],["Panamá","🇵🇦","Croacia","🇭🇷","23 jun"],
+        ["Panamá","🇵🇦","Inglaterra","🏴󠁧󠁢󠁥󠁮󠁧󠁿","27 jun"],["Croacia","🇭🇷","Ghana","🇬🇭","27 jun"]]},
 };
 
 // Aplanar todos los partidos con ID global
 const MATCHES = [];
 for (const grp of 'ABCDEFGHIJKL') {
-  G[grp].m.forEach(([l,lf,v,vf,d,time,tv]) => {
-    MATCHES.push({ id: MATCHES.length + 1, grp, local:l, lf, visita:v, vf, date:d, time:time||'', tv:tv||'' });
+  G[grp].m.forEach(([l,lf,v,vf,d]) => {
+    MATCHES.push({ id: MATCHES.length + 1, grp, local:l, lf, visita:v, vf, date:d });
   });
 }
 
@@ -673,37 +625,6 @@ const DATE_MAP = {};
     DATE_MAP[ds] = new Date(2026, months[mon] ?? 5, parseInt(d));
   });
 })();
-
-
-// ═══════════════════════════════════════════════════
-//  AUTO-SYNC DE RESULTADOS — football-data.org (gratis)
-//  Registro en: https://www.football-data.org/client/register
-//  Pega tu API key abajo (es gratuita)
-// ═══════════════════════════════════════════════════
-// ESPN API — sin registro ni API key, funciona directo desde el navegador
-const ESPN_API = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard";
-
-// Mapeo: nombres en español → nombres en inglés de la API
-// Mapeo español → nombres exactos en API-Football (RapidAPI)
-const TEAM_MAP = {
-  "México":"Mexico","Sudáfrica":"South Africa","Corea del Sur":"South Korea",
-  "Chequia":"Czech Republic","Canadá":"Canada","Bosnia y Herzegovina":"Bosnia",
-  "Qatar":"Qatar","Suiza":"Switzerland","Brasil":"Brazil","Marruecos":"Morocco",
-  "Haití":"Haiti","Escocia":"Scotland","Estados Unidos":"United States",
-  "Paraguay":"Paraguay","Australia":"Australia","Turquía":"Turkey",
-  "Alemania":"Germany","Curazao":"Curacao","Costa de Marfil":"Ivory Coast",
-  "Ecuador":"Ecuador","Países Bajos":"Netherlands","Japón":"Japan",
-  "Suecia":"Sweden","Túnez":"Tunisia","Bélgica":"Belgium","Egipto":"Egypt",
-  "Irán":"Iran","Nueva Zelanda":"New Zealand","España":"Spain",
-  "Cabo Verde":"Cape Verde","Arabia Saudita":"Saudi Arabia","Uruguay":"Uruguay",
-  "Francia":"France","Senegal":"Senegal","Noruega":"Norway","Iraq":"Iraq",
-  "Argentina":"Argentina","Argelia":"Algeria","Austria":"Austria",
-  "Jordania":"Jordan","Portugal":"Portugal","DR Congo":"DR Congo",
-  "Uzbekistán":"Uzbekistan","Colombia":"Colombia","Inglaterra":"England",
-  "Croacia":"Croatia","Ghana":"Ghana","Panamá":"Panama",
-};
-
-let lastSync = null;
 
 // ── CONFIG ──
 const LOCKED = false; // → true cuando empiece el torneo y ya no quieras recibir pronósticos
@@ -745,9 +666,6 @@ const AV_COLORS = [
 // ── STATE ──
 let parts = [], me = null, isAdmin = sessionStorage.getItem("qm26_admin") === "1", showPublicPicks = DEFAULT_SHOW_PUBLIC_PICKS;
 let selectedExportIds = new Set();
-let realResults = {}; // {matchId: {gl, gv, final}} resultados reales
-let hasUnsavedChanges = false; // declarado temprano
-let lastApiSync = 0; // timestamp del último sync con la API para evitar TDZ
 
 function docIdFromName(name) {
   return name
@@ -772,21 +690,6 @@ function load() {
     if (doc.exists) {
       showPublicPicks = !!doc.data().showPublicPicks;
       realResults = doc.data().realResults || {};
-      lastApiSync = doc.data().lastApiSync || 0;
-      const live = doc.data().liveMatches || 0;
-      // Actualizar badge EN VIVO en el tab de Participantes
-      const liveTab = document.querySelector('.tab:nth-child(2)');
-      if (liveTab) {
-        const existing = liveTab.querySelector('.live-tab-dot');
-        if (live > 0 && !existing) {
-          const dot = document.createElement('span');
-          dot.className = 'live-tab-dot';
-          dot.style.cssText = 'display:inline-block;width:7px;height:7px;background:var(--red);border-radius:50%;margin-left:5px;animation:blink 1.4s infinite;vertical-align:middle';
-          liveTab.appendChild(dot);
-        } else if (live === 0 && existing) {
-          existing.remove();
-        }
-      }
     } else {
       showPublicPicks = DEFAULT_SHOW_PUBLIC_PICKS;
       realResults = {};
@@ -795,7 +698,6 @@ function load() {
     if (activePage === 'page-ranking') buildRanking();
     if (activePage === 'page-admin') buildAdmin();
     buildUpcoming();
-    refreshOpenSimulators(); // actualiza simuladores abiertos con el nuevo marcador
   }, err => console.warn('No se pudo leer configuración', err));
 
   db.collection(COLLECTION).orderBy('ts', 'desc').onSnapshot(snapshot => {
@@ -857,13 +759,12 @@ function startForm() {
   document.getElementById('locked-msg').style.display = 'none';
   document.getElementById('prog-wrap').style.display = 'block';
 
+  renderGames(); prefill(); refreshProgress();
   buildUpcoming();
 
   const existing = parts.find(p => p.name.toLowerCase() === n.toLowerCase());
   if (existing && existing.filled > 0) {
-    // Participante existente → solo lectura, sin tocar hasUnsavedChanges
     editModeActive = false;
-    document.getElementById('prog-wrap').style.display = 'none';
     document.getElementById('games-wrap').style.display = 'none';
     document.getElementById('submit-bar').style.display = 'none';
     buildMyPicks(false);
@@ -871,12 +772,8 @@ function startForm() {
     if (btn) { btn.textContent = 'Ver mis pronósticos'; btn.style.background = 'var(--green)'; }
     setTimeout(() => document.getElementById('mypicks-wrap').scrollIntoView({behavior:'smooth',block:'start'}), 120);
   } else {
-    // Participante nuevo → modo edición completo
     editModeActive = true;
-    document.getElementById('prog-wrap').style.display = 'block';
     document.getElementById('mypicks-wrap').style.display = 'none';
-    renderGames(); prefill(); refreshProgress();
-    hasUnsavedChanges = false; // prefill no es "cambio"
     document.getElementById('games-wrap').style.display = 'block';
     document.getElementById('submit-bar').style.display = 'block';
     setTimeout(() => document.getElementById('games-wrap').scrollIntoView({behavior:'smooth',block:'start'}), 120);
@@ -899,8 +796,8 @@ function renderGames() {
       html += `
         <div class="game-card" id="card-${m.id}" style="border-left:3px solid ${gd.c}">
           <div class="game-top" style="background:${gd.c}">
-            <span class="game-id">#${m.id} · ${m.time}</span>
-            <span class="game-date">${m.date}${m.tv ? ' · ' + m.tv : ''}</span>
+            <span class="game-id">#${m.id}</span>
+            <span class="game-date">${m.date}</span>
           </div>
           <div class="game-body">
             <div class="team-name r">
@@ -928,7 +825,6 @@ function onScore(id) {
   const gv = document.getElementById('gv-' + id);
   gl.classList.toggle('has-v', gl.value !== '');
   gv.classList.toggle('has-v', gv.value !== '');
-  hasUnsavedChanges = true; // usuario realmente escribió algo
   refreshProgress();
 }
 
@@ -958,7 +854,7 @@ function refreshProgress() {
     : `<span style="color:var(--green);font-weight:700">✓ Completo</span>`;
   lbl.innerHTML = `<span>${filled} / 72 pronosticados</span>${pendTag}`;
   lbl.className = 'prog-label' + (filled === 72 ? ' done' : '');
-  // hasUnsavedChanges se setea solo desde onScore() cuando el usuario realmente edita
+  hasUnsavedChanges = true;
 }
 
 async function saveQuiniela() {
@@ -1011,7 +907,6 @@ function calcTotalPoints(participant) {
   if (!Object.keys(realResults).length) return null;
   let total = 0;
   for (const [matchIdStr, res] of Object.entries(realResults)) {
-    if (res.final === false) continue; // Solo omite marcadores EN VIVO (final:false)
     const matchId = parseInt(matchIdStr);
     const pk = (participant.picks||[]).find(p => p.id === matchId);
     if (!pk || pk.gl === '' || pk.gv === '') continue;
@@ -1019,17 +914,6 @@ function calcTotalPoints(participant) {
     if (pts !== null) total += pts;
   }
   return total;
-}
-
-// Resultados solo finales (para ranking)
-function countResultadosFinales() {
-  // Cuenta finales explícitos Y manuales (sin flag = ingresados por admin = finales)
-  return Object.values(realResults).filter(r => r.final || r.final === undefined).length;
-}
-
-// Resultados en vivo (partidos en curso)
-function getResultadosEnVivo() {
-  return Object.entries(realResults).filter(([,r]) => r.final === false); // solo IN_PLAY explícito
 }
 
 // Cuántos partidos tienen resultado real ingresado
@@ -1115,7 +999,7 @@ async function saveResultados() {
     const gl = document.getElementById('rgl-'+m.id)?.value;
     const gv = document.getElementById('rgv-'+m.id)?.value;
     if (gl !== '' && gl !== undefined && gv !== '' && gv !== undefined) {
-      results[m.id] = { gl, gv, final: true }; // admin confirma resultado final
+      results[m.id] = { gl, gv };
     }
   });
 
@@ -1152,104 +1036,17 @@ async function saveResultados() {
   }
 }
 
-
-// ═══════════════════════════════════════════════════
-//  SYNC DE RESULTADOS DESDE INTERNET
-// ═══════════════════════════════════════════════════
-// Los resultados los actualiza el GitHub Action cada 5 minutos automáticamente.
-// Esta función solo refresca la vista local con los datos que ya están en Firebase.
-// No necesita llamar a ninguna API externa.
-async function syncResultados() {
-  updateSyncStatus('ok', 0, 0);
-  buildRanking();
-  buildUpcoming();
-  refreshOpenSimulators();
-  lastSync = Date.now();
-}
-
-function updateSyncStatus(state, count, live) {
-  const el = document.getElementById('sync-status');
-  if (!el) return;
-  const time = new Date().toLocaleTimeString('es', {hour:'2-digit', minute:'2-digit'});
-  const msgs = {
-    syncing: {txt:'🔄 Actualizando…', color:'var(--muted)'},
-    ok:      {txt:`✅ Al día · ${time}`, color:'var(--muted)'},
-    updated: {txt:`⚽ ${count} resultado(s) nuevo(s) · ${time}`, color:'var(--green)'},
-    live:    {txt:`🔴 Partido en curso · actualizado ${time}`, color:'var(--red)'},
-    error:   {txt:`⚠️ Sin conexión · ${time}`, color:'var(--red)'},
-    nokey:   {txt:'🔑 Configura tu API key para activar el sync', color:'#d97706'},
-  };
-  const m = msgs[state] || msgs.ok;
-  el.textContent = m.txt;
-  el.style.color = m.color;
-  el.style.fontWeight = ['updated','live'].includes(state) ? '700' : '500';
-}
-
-
-// ── SYNC MANUAL ──
-// Cualquier participante puede tocar "🔄 Refrescar" y todos ven el cambio
-// vía Firebase onSnapshot. Sin polling automático.
-
-function startAutoSync() {
-  // Solo un sync inicial al cargar para reflejar el estado actual
-  if (false) { // ESPN API no necesita key
-    updateSyncStatus('nokey');
-    return;
-  }
-  syncResultados();
-}
-
-
-// Botón público — solo refresca la vista desde Firebase (sin llamar a la API).
-// Firebase onSnapshot ya entrega actualizaciones en tiempo real a todos los participantes.
-// El admin es quien sincroniza con la API desde su panel.
-async function syncPublic() {
-  const btn = document.querySelector('[onclick="syncPublic()"]');
-  const statusEl = document.getElementById('sync-status-pub');
-  const SYNC_COOLDOWN = 2 * 60 * 1000; // 2 min entre llamadas a la API
-  const tiempoDesdeSync = Date.now() - (lastApiSync || 0);
-
-  if (tiempoDesdeSync < SYNC_COOLDOWN) {
-    // Alguien ya sincronizó hace menos de 2 min — solo refrescar vista local
-    buildRanking(); refreshOpenSimulators();
-    const hace = Math.round(tiempoDesdeSync / 1000);
-    if (statusEl) statusEl.textContent = `Actualizado hace ${hace}s · los resultados llegan automáticamente`;
-    return;
-  }
-
-  // Pasaron más de 2 min — esta persona dispara el sync con la API
-  if (btn) { btn.textContent = '🔄 Actualizando…'; btn.disabled = true; }
-  if (statusEl) statusEl.textContent = 'Consultando resultados…';
-  await syncResultados();
-  if (btn) { btn.textContent = '🔄 Refrescar'; btn.disabled = false; }
-  if (statusEl) {
-    const time = new Date().toLocaleTimeString('es', {hour:'2-digit',minute:'2-digit'});
-    statusEl.textContent = `Actualizado · ${time}`;
-  }
-}
-
 // ── RANKING ──
 function buildRanking() {
   const el = document.getElementById('ranking-list');
-
-  // Botón de actualización manual visible para todos (dentro de la lista, sin duplicar)
-  const syncKey = true; // ESPN API siempre activa
-  const syncBar = syncKey ? `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:.85rem;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:.65rem 1rem;box-shadow:var(--shadow)">
-      <div style="flex:1;font-size:11px" id="sync-status-pub">Los resultados llegan automáticamente · toca para refrescar</div>
-      <button onclick="syncPublic()" style="background:var(--navy3);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0">
-        🔄 Refrescar
-      </button>
-    </div>` : '';
-
   if (!parts.length) {
-    el.innerHTML = syncBar + `<div class="empty-state"><span class="empty-icon">📋</span><p>Aún no hay pronósticos.<br>Comparte el link con tus participantes.</p></div>`;
+    el.innerHTML = `<div class="empty-state"><span class="empty-icon">📋</span><p>Aún no hay pronósticos.<br>Comparte el link con tus participantes.</p></div>`;
     return;
   }
 
-  const hasResults = countResultadosFinales() > 0;
-  const liveGames  = getResultadosEnVivo();
+  const hasResults = countResultados() > 0;
 
+  // Sort: by real points if results available, else by fills
   const sorted = [...parts].map(p => ({
     ...p,
     realPts: hasResults ? calcTotalPoints(p) : null
@@ -1261,18 +1058,16 @@ function buildRanking() {
   const medals = ['🥇','🥈','🥉'];
 
   const modeNote = hasResults
-    ? `<div class="ranking-mode-note live">
-        ${liveGames.length > 0 ? '🔴 ' + liveGames.length + ' partido(s) en curso' : '⚽ Clasificación'} · 
-        ${countResultadosFinales()} de 72 partidos finalizados
-       </div>`
-    : `<div class="ranking-mode-note">📋 Los puntos aparecen al finalizar los partidos</div>`;
+    ? `<div class="ranking-mode-note live">⚽ Clasificación en vivo · ${countResultados()} de 72 partidos con resultado</div>`
+    : `<div class="ranking-mode-note">📋 Participación registrada · Los puntos aparecerán cuando el admin ingrese resultados</div>`;
 
   const privacyMsg = showPublicPicks ? '' : `
     <div class="private-note">
-      🔒 Los pronósticos están ocultos temporalmente. Cuando el administrador active la vista pública, aquí se podrán revisar.
+      🔒 Los pronósticos están ocultos temporalmente para evitar copia entre participantes. 
+      Cuando el administrador active la vista pública, aquí se podrán revisar los marcadores.
     </div>`;
 
-  el.innerHTML = syncBar + modeNote + privacyMsg + sorted.map((p, i) => {
+  el.innerHTML = modeNote + privacyMsg + sorted.map((p, i) => {
     const av = AV_COLORS[i % AV_COLORS.length];
     const ini = p.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
     const pct = Math.round(p.filled / 72 * 100);
@@ -1281,14 +1076,9 @@ function buildRanking() {
     const rows = showPublicPicks ? p.picks.map(pk => {
       const m = MATCHES.find(x => x.id === pk.id);
       const has = pk.gl !== '' && pk.gv !== '';
-      const res = realResults[pk.id] || realResults[String(pk.id)];
-      // final:true o undefined (manual) = final · final:false = en vivo
-      const isFinalRes = res && res.final !== false;
-      const matchPts = (has && isFinalRes) ? calcPoints(pk.gl, pk.gv, res.gl, res.gv) : null;
-      const liveTxt  = (has && res && res.final === false) ? '🔴 '+res.gl+'-'+res.gv : '';
-      const ptsTxt   = matchPts !== null ? (matchPts > 0 ? '+' : '') + matchPts + 'pts' : liveTxt;
-      const ptColor  = matchPts !== null ? (matchPts>=50?'var(--green)':matchPts>=20?'var(--navy3)':'var(--muted)') : 'var(--red)';
-      const ptsLabel = ptsTxt ? '<span style="font-size:9px;font-weight:700;color:'+ptColor+'">'+ptsTxt+'</span>' : '';
+      const res = realResults[pk.id];
+      const matchPts = (has && res) ? calcPoints(pk.gl, pk.gv, res.gl, res.gv) : null;
+      const ptsLabel = matchPts !== null ? `<span style="font-size:9px;font-weight:700;color:${matchPts>=50?'var(--green)':matchPts>=20?'var(--navy3)':'var(--muted)'}">${matchPts>0?'+':''}${matchPts}pts</span>` : '';
       return `<div class="pick-row">
         <span class="pick-game">${m.lf} ${m.local} vs ${m.visita} ${m.vf}</span>
         <div style="display:flex;align-items:center;gap:6px">
@@ -1301,8 +1091,12 @@ function buildRanking() {
     const clickAttr = showPublicPicks ? `onclick="toggleRank('r${i}')"` : '';
     const chev = showPublicPicks ? `<span class="chev" id="ch-r${i}">▼</span>` : `<span class="chev">🔒</span>`;
     const body = showPublicPicks ? `<div class="rank-body" id="rb-r${i}">${rows}</div>` : '';
+
     const rightSide = hasResults
-      ? `<div style="text-align:right"><div class="rank-pts-badge">${pts ?? '–'}</div><div class="rank-pts-label">puntos</div></div>`
+      ? `<div style="text-align:right">
+           <div class="rank-pts-badge">${pts ?? '–'}</div>
+           <div class="rank-pts-label">puntos</div>
+         </div>`
       : `<span class="pct-txt">${pct}%</span>`;
 
     return `<div class="rank-card">
@@ -1315,9 +1109,14 @@ function buildRanking() {
             <div class="rank-sub">${hasResults ? (pts ?? 0) + ' pts · ' : ''}${p.filled}/72 partidos</div>
           </div>
         </div>
-        <div class="rank-right">${rightSide}${chev}</div>
+        <div class="rank-right">
+          ${rightSide}
+          ${chev}
+        </div>
       </div>
-      <div class="prog-mini"><div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${pct}%"></div></div></div>
+      <div class="prog-mini">
+        <div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${pct}%"></div></div>
+      </div>
       ${body}
     </div>`;
   }).join('');
@@ -1328,12 +1127,20 @@ function renderAdminGate() {
   const gate = document.getElementById('admin-gate');
   const controls = document.getElementById('admin-controls');
   if (!gate || !controls) return;
-  if (isAdmin) { gate.innerHTML = ''; controls.style.display = 'block'; return; }
+
+  if (isAdmin) {
+    gate.innerHTML = '';
+    controls.style.display = 'block';
+    return;
+  }
+
   controls.style.display = 'none';
   gate.innerHTML = `
     <div class="admin-lock">
       <div class="admin-lock-title">🔐 Panel de administrador</div>
-      <div class="admin-lock-desc">Ingresa la clave de administrador para borrar participantes, exportar a Excel y activar la vista pública de pronósticos.</div>
+      <div class="admin-lock-desc">
+        Ingresa la clave de administrador para borrar participantes, exportar a Excel y activar la vista pública de pronósticos.
+      </div>
       <div class="admin-pin-row">
         <input class="admin-pin-input" id="admin-pin" type="password" placeholder="Clave de administrador" onkeydown="if(event.key==='Enter') adminLogin()">
         <button class="go-btn" onclick="adminLogin()">Entrar</button>
@@ -1344,54 +1151,87 @@ function renderAdminGate() {
 
 function adminLogin() {
   const pin = document.getElementById('admin-pin')?.value || '';
-  if (pin !== ADMIN_PIN) { toast('Clave incorrecta'); return; }
+  if (pin !== ADMIN_PIN) {
+    toast('Clave incorrecta');
+    return;
+  }
   isAdmin = true;
   sessionStorage.setItem('qm26_admin', '1');
-  renderAdminGate(); buildAdmin();
+  renderAdminGate();
+  buildAdmin();
   toast('Modo administrador activado');
 }
 
 function adminLogout() {
   isAdmin = false;
   sessionStorage.removeItem('qm26_admin');
-  renderAdminGate(); buildAdmin();
+  renderAdminGate();
+  buildAdmin();
   toast('Sesión de administrador cerrada');
 }
 
 async function setPublicPicks(value) {
   if (!isAdmin) return toast('Solo el administrador puede cambiar esto');
-  if (!db) { showPublicPicks = value; buildAdmin(); buildRanking(); return; }
+  if (!db) {
+    showPublicPicks = value;
+    buildAdmin();
+    buildRanking();
+    return;
+  }
   try {
-    await db.collection(SETTINGS_COLLECTION).doc(SETTINGS_DOC).set(
-      { showPublicPicks: value, updatedAt: Date.now() }, { merge: true });
+    await db.collection(SETTINGS_COLLECTION).doc(SETTINGS_DOC).set({
+      showPublicPicks: value,
+      updatedAt: Date.now()
+    }, { merge: true });
     toast(value ? 'Pronósticos visibles para todos' : 'Pronósticos ocultos para participantes');
-  } catch(err) { console.error(err); toast('No se pudo cambiar la configuración'); }
+  } catch (err) {
+    console.error(err);
+    toast('No se pudo cambiar la configuración');
+  }
 }
+
 
 function safeHtml(text) {
-  return String(text ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+  return String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
-function exportIdForParticipant(p) { return p._id || docIdFromName(p.name); }
+function exportIdForParticipant(p) {
+  return p._id || docIdFromName(p.name);
+}
 
 function buildExportSelector(sorted) {
   const box = document.getElementById('export-select-list');
   if (!box) return;
+
   const validIds = new Set(sorted.map(exportIdForParticipant));
   selectedExportIds = new Set([...selectedExportIds].filter(id => validIds.has(id)));
-  if (selectedExportIds.size === 0 && sorted.length)
+
+  // Si aún no se ha seleccionado nada, marcamos todos por comodidad.
+  if (selectedExportIds.size === 0 && sorted.length) {
     sorted.forEach(p => selectedExportIds.add(exportIdForParticipant(p)));
+  }
+
   box.innerHTML = sorted.map(p => {
     const id = exportIdForParticipant(p);
     const checked = selectedExportIds.has(id) ? 'checked' : '';
-    return `<label class="export-check"><input type="checkbox" data-export-id="${safeHtml(id)}" ${checked} onchange="toggleExportSelection('${safeHtml(id)}', this.checked)"><span>${safeHtml(p.name)} · ${p.filled}/72</span></label>`;
+    return `
+      <label class="export-check">
+        <input type="checkbox" data-export-id="${safeHtml(id)}" ${checked} onchange="toggleExportSelection('${safeHtml(id)}', this.checked)">
+        <span>${safeHtml(p.name)} · ${p.filled}/72</span>
+      </label>`;
   }).join('');
+
   syncExportSelectionUI();
 }
 
 function toggleExportSelection(id, checked) {
-  if (checked) selectedExportIds.add(id); else selectedExportIds.delete(id);
+  if (checked) selectedExportIds.add(id);
+  else selectedExportIds.delete(id);
   syncExportSelectionUI();
 }
 
@@ -1400,7 +1240,8 @@ function selectAllExportParticipants(value) {
   checks.forEach(ch => {
     ch.checked = value;
     const id = ch.getAttribute('data-export-id');
-    if (value) selectedExportIds.add(id); else selectedExportIds.delete(id);
+    if (value) selectedExportIds.add(id);
+    else selectedExportIds.delete(id);
   });
   syncExportSelectionUI();
 }
@@ -1409,124 +1250,169 @@ function syncExportSelectionUI() {
   const help = document.getElementById('export-selected-help');
   if (!help) return;
   const n = selectedExportIds.size;
-  help.textContent = n === 0 ? 'Selecciona al menos un participante para copiarlo a Excel.'
-    : `${n} participante${n===1?'':'s'} seleccionado${n===1?'':'s'} para exportar.`;
+  help.textContent = n === 0
+    ? 'Selecciona al menos un participante para copiarlo a Excel.'
+    : `${n} participante${n === 1 ? '' : 's'} seleccionado${n === 1 ? '' : 's'} para exportar.`;
 }
 
 function getSelectedExportParticipants() {
-  const sorted = [...parts].sort((a,b) => a.name.localeCompare(b.name));
-  return sorted.filter(p => selectedExportIds.has(exportIdForParticipant(p)));
+  const sorted = [...parts].sort((a, b) => a.name.localeCompare(b.name));
+  const selected = sorted.filter(p => selectedExportIds.has(exportIdForParticipant(p)));
+  return selected;
 }
 
 function buildAdminControls() {
   const controls = document.getElementById('admin-controls');
   if (!controls) return;
   controls.innerHTML = `
-    <div class="control-card" style="margin-bottom:.75rem">
-      <div class="control-title" style="display:flex;align-items:center;gap:8px">
-        🌐 Sync de resultados
-        <span style="font-size:9px;font-weight:800;background:#e7f8ee;color:#176b3a;padding:2px 8px;border-radius:99px">MANUAL</span>
-      </div>
-      <div class="control-desc">Resultados desde <strong>football-data.org</strong>. Gratis en <a href="https://www.football-data.org/client/register" target="_blank" style="color:var(--navy3);font-weight:700">football-data.org</a>.</div>
-      <div id="sync-status" style="font-size:11px;color:var(--muted);margin:.4rem 0"></div>
-      <div style="display:flex;gap:8px;margin-top:.6rem">
-        <button onclick="syncResultados()" style="flex:1;padding:9px;background:var(--navy3);color:#fff;border:none;border-radius:var(--radius-sm);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🔄 Sincronizar con API</button>
-      </div>
-    </div>
     <div class="control-card">
       <div class="control-title">Configuración de visibilidad</div>
-      <div class="control-desc">Antes del torneo conviene mantener ocultos los marcadores para evitar copia.</div>
+      <div class="control-desc">
+        Antes del torneo conviene mantener ocultos los marcadores para evitar copia. 
+        Al iniciar el campeonato puedes activar la vista pública.
+      </div>
       <div class="ctrl-row">
-        <span class="ctrl-badge ${showPublicPicks?'on':''}">${showPublicPicks?'Pronósticos visibles':'Pronósticos ocultos'}</span>
-        <button class="toggle-btn" onclick="setPublicPicks(${showPublicPicks?'false':'true'})">${showPublicPicks?'Ocultar pronósticos':'Mostrar pronósticos'}</button>
+        <span class="ctrl-badge ${showPublicPicks ? 'on' : ''}">
+          ${showPublicPicks ? 'Pronósticos visibles' : 'Pronósticos ocultos'}
+        </span>
+        <button class="toggle-btn" onclick="setPublicPicks(${showPublicPicks ? 'false' : 'true'})">
+          ${showPublicPicks ? 'Ocultar pronósticos' : 'Mostrar pronósticos'}
+        </button>
       </div>
       <div style="text-align:right;margin-top:.7rem">
         <button onclick="adminLogout()" style="border:none;background:none;color:#aaa;font-size:11px;cursor:pointer;font-family:inherit">Cerrar modo admin</button>
       </div>
     </div>
-    ${buildResultsAdmin()}`;
+  ${buildResultsAdmin()}`;
 }
 
 function buildAdmin() {
   renderAdminGate();
   const el = document.getElementById('admin-list');
   const expEl = document.getElementById('export-card');
-  if (!isAdmin) { el.innerHTML = ''; expEl.style.display = 'none'; return; }
+
+  if (!isAdmin) {
+    el.innerHTML = '';
+    expEl.style.display = 'none';
+    return;
+  }
+
   buildAdminControls();
+
   if (!parts.length) {
     el.innerHTML = `<div class="empty-state"><span class="empty-icon">⚙️</span><p>No hay pronósticos registrados.<br>Comparte el link para que los participantes llenen su quiniela.</p></div>`;
-    expEl.style.display = 'none'; return;
+    expEl.style.display = 'none';
+    return;
   }
   expEl.style.display = 'block';
-  const sorted = [...parts].sort((a,b) => b.filled - a.filled);
+  const sorted = [...parts].sort((a, b) => b.filled - a.filled);
   buildExportSelector(sorted);
-  el.innerHTML = sorted.map((p,i) => {
-    const av = AV_COLORS[i%AV_COLORS.length];
-    const ini = p.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
-    const pct = Math.round(p.filled/72*100);
+
+  el.innerHTML = sorted.map((p, i) => {
+    const av = AV_COLORS[i % AV_COLORS.length];
+    const ini = p.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+    const pct = Math.round(p.filled / 72 * 100);
     const rows = p.picks.map(pk => {
-      const m = MATCHES.find(x=>x.id===pk.id);
-      const has = pk.gl!==''&&pk.gv!=='';
-      return `<div class="pick-row"><span class="pick-game">${m.lf} ${m.local} vs ${m.visita} ${m.vf}</span><span class="pick-score${has?'':' empty'}">${has?pk.gl+' – '+pk.gv:'–'}</span></div>`;
+      const m = MATCHES.find(x => x.id === pk.id);
+      const has = pk.gl !== '' && pk.gv !== '';
+      return `<div class="pick-row">
+        <span class="pick-game">${m.lf} ${m.local} vs ${m.visita} ${m.vf}</span>
+        <span class="pick-score${has ? '' : ' empty'}">${has ? pk.gl + ' – ' + pk.gv : '–'}</span>
+      </div>`;
     }).join('');
+
     return `<div class="rank-card">
       <div class="rank-head" onclick="toggleRank('a${i}')">
         <div class="rank-left">
           <div class="avatar" style="background:${av.bg};color:${av.c}">${ini}</div>
-          <div><div class="rank-name">${p.name}</div><div class="rank-sub">${p.filled}/72 · ${pct}% completado</div></div>
+          <div>
+            <div class="rank-name">${p.name}</div>
+            <div class="rank-sub">${p.filled}/72 · ${pct}% completado</div>
+          </div>
         </div>
         <div class="rank-right">
           <button class="del-btn" onclick="event.stopPropagation();delPart('${p.name.replace(/'/g,"\\'")}')">✕</button>
           <span class="chev" id="ch-a${i}">▼</span>
         </div>
       </div>
-      <div class="prog-mini"><div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${pct}%"></div></div></div>
+      <div class="prog-mini">
+        <div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${pct}%"></div></div>
+      </div>
       <div class="rank-body" id="rb-a${i}">${rows}</div>
     </div>`;
   }).join('');
 }
 
 function toggleRank(id) {
-  document.getElementById('rb-'+id).classList.toggle('open');
-  document.getElementById('ch-'+id).classList.toggle('open');
+  document.getElementById('rb-' + id).classList.toggle('open');
+  document.getElementById('ch-' + id).classList.toggle('open');
 }
-
 async function delPart(name) {
   if (!isAdmin) return toast('Solo el administrador puede eliminar');
   if (!confirm(`¿Eliminar pronóstico de ${name}?`)) return;
-  if (!db) { parts = parts.filter(p=>p.name!==name); persist(); buildAdmin(); return; }
-  try { await db.collection(COLLECTION).doc(docIdFromName(name)).delete(); toast('Participante eliminado'); }
-  catch(err) { console.error(err); toast('No se pudo eliminar'); }
+
+  if (!db) {
+    parts = parts.filter(p => p.name !== name);
+    persist(); buildAdmin();
+    return;
+  }
+
+  try {
+    await db.collection(COLLECTION).doc(docIdFromName(name)).delete();
+    toast('Participante eliminado');
+  } catch (err) {
+    console.error(err);
+    toast('No se pudo eliminar');
+  }
 }
 
 async function clearAll() {
   if (!isAdmin) return toast('Solo el administrador puede borrar todo');
   if (!confirm('¿Borrar TODOS los pronósticos? Esta acción no se puede deshacer.')) return;
-  if (!db) { parts=[]; persist(); buildAdmin(); return; }
+
+  if (!db) {
+    parts = []; persist(); buildAdmin();
+    return;
+  }
+
   try {
     const snap = await db.collection(COLLECTION).get();
     const batch = db.batch();
     snap.docs.forEach(doc => batch.delete(doc.ref));
     await batch.commit();
     toast('Todos los pronósticos fueron borrados');
-  } catch(err) { console.error(err); toast('No se pudieron borrar los datos'); }
+  } catch (err) {
+    console.error(err);
+    toast('No se pudieron borrar los datos');
+  }
 }
 
 // ── EXPORT ──
-function buildExcelTSV(selectedParts=null) {
+function buildExcelTSV(selectedParts = null) {
+  // Formato para Excel:
+  // Columnas = participantes seleccionados; filas = partidos.
+  // Cada participante usa 2 columnas: goles local y goles visita.
   const selected = selectedParts || getSelectedExportParticipants();
   if (!selected.length) return '';
+
   const header = [];
-  selected.forEach(p => { header.push(p.name); header.push(''); });
+  selected.forEach(p => {
+    header.push(p.name);
+    header.push('');
+  });
+
   const lines = [header.join('\t')];
+
   MATCHES.forEach(m => {
     const row = [];
     selected.forEach(p => {
-      const pk = p.picks.find(x=>x.id===m.id);
-      row.push(pk&&pk.gl!==''?pk.gl:''); row.push(pk&&pk.gv!==''?pk.gv:'');
+      const pk = p.picks.find(x => x.id === m.id);
+      row.push(pk && pk.gl !== '' ? pk.gl : '');
+      row.push(pk && pk.gv !== '' ? pk.gv : '');
     });
     lines.push(row.join('\t'));
   });
+
   return lines.join('\n');
 }
 
@@ -1536,12 +1422,12 @@ function copyForExcel() {
   if (!selected.length) return toast('Selecciona al menos un participante');
   const txt = buildExcelTSV(selected);
   navigator.clipboard.writeText(txt)
-    .then(() => toast(`¡Copiado! ${selected.length} participante${selected.length===1?'':'s'}`))
+    .then(() => toast(`¡Copiado! ${selected.length} participante${selected.length === 1 ? '' : 's'} seleccionado${selected.length === 1 ? '' : 's'}`))
     .catch(() => {
       const ta = document.createElement('textarea');
       ta.value = txt; document.body.appendChild(ta); ta.select();
       document.execCommand('copy'); document.body.removeChild(ta);
-      toast(`¡Copiado! ${selected.length} participante${selected.length===1?'':'s'}`);
+      toast(`¡Copiado! ${selected.length} participante${selected.length === 1 ? '' : 's'} seleccionado${selected.length === 1 ? '' : 's'}`);
     });
 }
 
@@ -1549,27 +1435,40 @@ function downloadCSV() {
   if (!isAdmin) return toast('Solo el administrador puede descargar CSV');
   const sorted = getSelectedExportParticipants();
   if (!sorted.length) return toast('Selecciona al menos un participante');
-  const header = ['#','Local','Visita'];
-  sorted.forEach(p => { header.push(`${p.name} Local`); header.push(`${p.name} Visita`); });
+
+  const header = ['#', 'Local', 'Visita'];
+  sorted.forEach(p => {
+    header.push(`${p.name} Local`);
+    header.push(`${p.name} Visita`);
+  });
+
   const rows = [header];
   MATCHES.forEach(m => {
     const row = [m.id, m.local, m.visita];
     sorted.forEach(p => {
-      const pk = p.picks.find(x=>x.id===m.id);
-      row.push(pk&&pk.gl!==''?pk.gl:''); row.push(pk&&pk.gv!==''?pk.gv:'');
+      const pk = p.picks.find(x => x.id === m.id);
+      row.push(pk && pk.gl !== '' ? pk.gl : '');
+      row.push(pk && pk.gv !== '' ? pk.gv : '');
     });
     rows.push(row);
   });
-  const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href=url; a.download='quiniela_mundial2026_seleccionados.csv';
+  const a = document.createElement('a'); a.href = url; a.download = 'quiniela_mundial2026_seleccionados.csv';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  toast(`CSV descargado: ${sorted.length} participante${sorted.length===1?'':'s'}`);
+  toast(`CSV descargado: ${sorted.length} participante${sorted.length === 1 ? '' : 's'}`);
 }
 
-// ── SCORING ──
+
+// ═══════════════════════════════════════
+//  DATOS — DATE_MAP, calcPoints, etc.
+// ═══════════════════════════════════════
+
+// DATE_MAP ya construido arriba desde MATCHES
+
 function calcPoints(myGl, myGv, realGl, realGv) {
   const ml=parseInt(myGl),mv=parseInt(myGv),rl=parseInt(realGl),rv=parseInt(realGv);
   if(isNaN(ml)||isNaN(mv)||isNaN(rl)||isNaN(rv)) return null;
@@ -1589,132 +1488,35 @@ function toggleScoringLegend() {
   document.getElementById('scoring-chev').classList.toggle('open');
 }
 
-// Refresca simuladores abiertos cuando cambia un resultado real (vía Firebase)
-function refreshOpenSimulators() {
-  MATCHES.forEach(m => {
-    // Actualizar score en la cartelera si está en vivo o finalizado
-    const ubody = document.getElementById('ubody-' + m.id);
-    if (ubody) {
-      const r = realResults[m.id] || realResults[String(m.id)];
-      if (r) {
-        const isFinal = r.final !== false;
-        const scoreHTML = isFinal
-          ? `<div class="upcoming-score"><div class="upcoming-score-nums final">${r.gl} – ${r.gv}</div><span class="upcoming-score-badge final">FINAL</span></div>`
-          : `<div class="upcoming-score"><div class="upcoming-score-nums live">${r.gl} – ${r.gv}</div><span class="upcoming-score-badge live">EN VIVO</span></div>`;
-        const vsEl = ubody.querySelector('.upcoming-vs, .upcoming-score');
-        if (vsEl) vsEl.outerHTML = scoreHTML;
-      }
-    }
-    // Actualizar simuladores abiertos
-    const card = document.getElementById('sim-' + m.id);
-    if (card && card.style.display !== 'none') {
-      card.innerHTML = buildSimulatorInner(m);
-      const res = realResults[m.id] || realResults[String(m.id)];
-      if (res && res.gl !== '' && res.gv !== '') {
-        setTimeout(() => runSimulation(m.id), 50);
-      }
-    }
-    // Auto-abrir simulador si el partido acaba de ponerse EN VIVO
-    const r2 = realResults[m.id] || realResults[String(m.id)];
-    if (r2 && r2.final === false) {
-      const simCard = document.getElementById('sim-' + m.id);
-      if (simCard && simCard.style.display === 'none') {
-        toggleSimulator(m.id);
-      }
-    }
-  });
-}
-
-
-// Actualizar desde la cartelera de próximos partidos
-async function syncAndRefreshUpcoming() {
-  toast('🔄 Actualizando vista…');
-  const btn = document.getElementById('upcoming-refresh-btn');
-  if (btn) { btn.textContent = '🔄 Actualizando…'; btn.disabled = true; }
-
-  const SYNC_COOLDOWN = 2 * 60 * 1000;
-  const tiempoDesdeSync = Date.now() - (lastApiSync || 0);
-
-  if (tiempoDesdeSync < SYNC_COOLDOWN) {
-    toast('⏱ Cooldown activo — ' + Math.round(tiempoDesdeSync/1000) + 's desde último sync');
-    // Ya se sincronizó recientemente — solo refrescar vista
-    buildUpcoming();
-    const hace = Math.round(tiempoDesdeSync / 1000);
-    const b2 = document.getElementById('upcoming-refresh-btn');
-    if (b2) { b2.textContent = `✅ Hace ${hace}s`; b2.disabled = false; }
-    setTimeout(() => {
-      const b3 = document.getElementById('upcoming-refresh-btn');
-      if (b3) b3.textContent = '🔄 Actualizar';
-    }, 2000);
-    return;
-  }
-
-  // Llamar a la API y actualizar
-  await syncResultados();
-  buildUpcoming();
-
-  // Auto-abrir simuladores de partidos EN VIVO
-  MATCHES.forEach(m => {
-    const r = realResults[m.id] || realResults[String(m.id)];
-    if (r && r.final === false) {
-      const card = document.getElementById('sim-' + m.id);
-      if (card && card.style.display === 'none') {
-        toggleSimulator(m.id);
-      }
-    }
-  });
-
-  const b2 = document.getElementById('upcoming-refresh-btn');
-  const time = new Date().toLocaleTimeString('es', {hour:'2-digit',minute:'2-digit'});
-  if (b2) { b2.textContent = `✅ ${time}`; b2.disabled = false; }
-  setTimeout(() => {
-    const b3 = document.getElementById('upcoming-refresh-btn');
-    if (b3) b3.textContent = '🔄 Actualizar';
-  }, 3000);
-}
-
-// ── PRÓXIMOS PARTIDOS + SIMULADOR ──
-function buildUpcomingScore(matchId) {
-  const r = realResults[matchId] || realResults[String(matchId)];
-  if (!r) return '<div class="upcoming-vs">vs</div>';
-  if (r.final === false)
-    return '<div class="upcoming-score"><div class="upcoming-score-nums live">'+r.gl+' – '+r.gv+'</div><span class="upcoming-score-badge live">EN VIVO</span></div>';
-  return '<div class="upcoming-score"><div class="upcoming-score-nums final">'+r.gl+' – '+r.gv+'</div><span class="upcoming-score-badge final">FINAL</span></div>';
-}
-
+// ═══════════════════════════════════════
+//  PRÓXIMOS PARTIDOS + SIMULADOR
+// ═══════════════════════════════════════
 function buildUpcoming() {
   const wrap = document.getElementById('upcoming-section');
   if (!wrap) return;
   const now = new Date();
   const today = new Date(now.getFullYear(),now.getMonth(),now.getDate());
   const limit = new Date(today); limit.setDate(today.getDate()+2);
+
   const upcoming = MATCHES.filter(m => {
     const d = DATE_MAP[m.date]; if (!d) return false;
     const md = new Date(d.getFullYear(),d.getMonth(),d.getDate());
     return md >= today && md < limit;
-  }).sort((a, b) => {
-    // Ordenar por fecha + hora
-    const da = DATE_MAP[a.date], db = DATE_MAP[b.date];
-    if (da - db !== 0) return da - db;
-    const [ha, ma2] = (a.time||'99:99').split(':').map(Number);
-    const [hb, mb2] = (b.time||'99:99').split(':').map(Number);
-    return ha*60+ma2 - (hb*60+mb2);
   });
+
   if (!upcoming.length) {
     const future = MATCHES.filter(m=>{const d=DATE_MAP[m.date];return d&&new Date(d.getFullYear(),d.getMonth(),d.getDate())>=today;});
     if (!future.length) { wrap.innerHTML=''; return; }
     wrap.innerHTML=`<div class="upcoming-none">No hay partidos hoy ni mañana · Próximos: <strong>${future[0].date}</strong></div>`;
     return;
   }
-  const hasLive = upcoming.some(m => {
-    const r = realResults[m.id]||realResults[String(m.id)];
-    return r && r.final === false;
-  });
+
   let html = `<div class="upcoming-section">
     <div class="upcoming-header">
-      <div class="upcoming-title">${hasLive?'<span class="live-dot"></span>':''}Próximos partidos</div>
-      <button class="upcoming-refresh-btn" id="upcoming-refresh-btn" onclick="syncAndRefreshUpcoming()">🔄 Actualizar</button>
+      <div class="upcoming-title"><span class="live-dot"></span>Próximos partidos</div>
+      <span class="upcoming-date-label">Hoy y mañana</span>
     </div>`;
+
   upcoming.forEach(m => {
     const gd = G[m.grp];
     const withPick = parts.filter(p=>{const pk=(p.picks||[]).find(x=>x.id===m.id);return pk&&pk.gl!==''&&pk.gv!=='';}).length;
@@ -1723,14 +1525,15 @@ function buildUpcoming() {
       ? `Ver pronósticos <span class="upcoming-chevron" id="uchev-${m.id}">▼</span>`
       : `<span style="color:var(--muted)">🔒 Pronósticos ocultos</span>`;
     const simBtnHtml = `<span class="upcoming-expand-hint" style="color:var(--gold)" onclick="event.stopPropagation();toggleSimulator(${m.id})">🧮 Simular puntos <span class="upcoming-chevron" id="simchev-${m.id}">▼</span></span>`;
+
     html += `<div class="upcoming-card" style="border-left:3px solid ${gd.c}">
       <div class="upcoming-top" style="background:${gd.c}">
-        <span class="upcoming-match-date">Grupo ${m.grp} · ${m.date} · ${m.time}</span>
-        <span class="upcoming-venue">${m.tv || 'Tigo Sports'}</span>
+        <span class="upcoming-match-date">Grupo ${m.grp} · ${m.date}</span>
+        <span class="upcoming-venue">${m.local} vs ${m.visita}</span>
       </div>
-      <div class="upcoming-body" id="ubody-${m.id}">
+      <div class="upcoming-body">
         <div class="upcoming-team r"><span class="upcoming-flag">${m.lf}</span>${m.local}</div>
-        ${buildUpcomingScore(m.id)}
+        <div class="upcoming-vs">vs</div>
         <div class="upcoming-team"><span class="upcoming-flag">${m.vf}</span>${m.visita}</div>
       </div>
       <div class="upcoming-footer">
@@ -1780,29 +1583,25 @@ function toggleUpcomingPicks(matchId) {
 }
 
 function buildSimulatorInner(m) {
-  const res = realResults[m.id] || realResults[String(m.id)];
-  const startGl = res ? res.gl : '';
-  const startGv = res ? res.gv : '';
-  const isLive = res && !res.final;
-  const isFinal = res && res.final;
-  const banner = isFinal
-    ? '<div style="padding:4px 12px 8px;text-align:center;font-size:10px;color:#166534;background:#dcfce7;border-bottom:1px solid #86efac">✅ Resultado final · puntos reales otorgados</div>'
-    : isLive
-    ? '<div style="padding:4px 12px 8px;text-align:center;font-size:10px;color:#991b1b;background:#fee2e2;border-bottom:1px solid #fca5a5">🔴 Marcador en vivo · cambia con cada gol</div>'
-    : '<div style="padding:4px 12px 8px;text-align:center;font-size:10px;color:#92400e;background:#fff8e8;border-bottom:1px solid #fde68a">Los puntos se calculan automáticamente al ingresar el marcador</div>';
   return `<div class="simulator-header">
     <span class="simulator-title">🧮 Simulador · ${m.lf} ${m.local} vs ${m.visita} ${m.vf}</span>
     <button class="simulator-close" onclick="toggleSimulator(${m.id})">✕</button>
   </div>
   <div class="sim-input-row">
     <span class="sim-label">${m.lf} ${m.local}</span>
-    <input class="sim-score-box" type="number" id="simgl-${m.id}" min="0" max="20" placeholder="–" inputmode="decimal" pattern="[0-9]*" value="${startGl}" oninput="onSimInput(${m.id})">
+    <input class="sim-score-box" type="number" id="simgl-${m.id}" min="0" max="20" placeholder="–"
+      inputmode="decimal" pattern="[0-9]*" oninput="onSimInput(${m.id})">
     <span class="sim-dash">–</span>
-    <input class="sim-score-box" type="number" id="simgv-${m.id}" min="0" max="20" placeholder="–" inputmode="decimal" pattern="[0-9]*" value="${startGv}" oninput="onSimInput(${m.id})">
+    <input class="sim-score-box" type="number" id="simgv-${m.id}" min="0" max="20" placeholder="–"
+      inputmode="decimal" pattern="[0-9]*" oninput="onSimInput(${m.id})">
     <span class="sim-label">${m.visita} ${m.vf}</span>
   </div>
-  ${banner}
-  <div class="sim-results" id="simresults-${m.id}"><div class="sim-no-picks">${res ? '' : 'Ingresa el marcador hipotético para calcular'}</div></div>`;
+  <div style="padding:4px 12px 8px;text-align:center;font-size:10px;color:#92400e;background:#fff8e8;border-bottom:1px solid #fde68a">
+    Los puntos se calculan automáticamente al ingresar el marcador
+  </div>
+  <div class="sim-results" id="simresults-${m.id}">
+    <div class="sim-no-picks">Ingresa el marcador hipotético para calcular</div>
+  </div>`;
 }
 
 function toggleSimulator(matchId) {
@@ -1811,46 +1610,36 @@ function toggleSimulator(matchId) {
   if (!card) return;
   const isOpen=card.style.display!=='none';
   card.style.display=isOpen?'none':'block';
-  if (!isOpen) {
-    const m=MATCHES.find(x=>x.id===matchId);
-    if(m) card.innerHTML=buildSimulatorInner(m);
-    // Si ya hay resultado real cargado, calcular automáticamente
-    const res = realResults[matchId] || realResults[String(matchId)];
-    if (res && res.gl !== '' && res.gv !== '') setTimeout(() => runSimulation(matchId), 50);
-  }
+  if (!isOpen) { const m=MATCHES.find(x=>x.id===matchId); if(m) card.innerHTML=buildSimulatorInner(m); }
   if (chev) chev.classList.toggle('open',!isOpen);
 }
 
 function onSimInput(matchId) {
-  const gl=document.getElementById('simgl-'+matchId)?.value;
-  const gv=document.getElementById('simgv-'+matchId)?.value;
-  if (gl!==''&&gl!==undefined&&gv!==''&&gv!==undefined) runSimulation(matchId);
+  const gl = document.getElementById('simgl-'+matchId)?.value;
+  const gv = document.getElementById('simgv-'+matchId)?.value;
+  if (gl !== '' && gl !== undefined && gv !== '' && gv !== undefined) {
+    runSimulation(matchId);
+  }
 }
 
 function runSimulation(matchId) {
   const gl=document.getElementById('simgl-'+matchId)?.value;
   const gv=document.getElementById('simgv-'+matchId)?.value;
-  if (!gl||!gv||gl===''||gv==='') {
-    const rc=document.getElementById('simresults-'+matchId);
-    if(rc) rc.innerHTML='<div class="sim-no-picks">Ingresa ambos goles para calcular</div>';
-    return;
-  }
+  if (!gl || !gv || gl==='' || gv==='') { document.getElementById('simresults-'+matchId).innerHTML='<div class="sim-no-picks">Ingresa ambos goles para calcular</div>'; return; }
   const resultsContainer=document.getElementById('simresults-'+matchId);
   if (!resultsContainer) return;
-  const m=MATCHES.find(x=>x.id===matchId);
+  // FIX 8: const m BEFORE html construction
+  const m = MATCHES.find(x=>x.id===matchId);
   const simParticipants=parts.filter(p=>{const pk=(p.picks||[]).find(x=>x.id===matchId);return pk&&pk.gl!==''&&pk.gv!=='';})
     .map(p=>{const pk=(p.picks||[]).find(x=>x.id===matchId);const pts=calcPoints(pk.gl,pk.gv,gl,gv);return{...p,simPts:pts,pickGl:pk.gl,pickGv:pk.gv};});
   if (!simParticipants.length){resultsContainer.innerHTML='<div class="sim-no-picks">Ningún participante tiene pronóstico para este partido.</div>';return;}
   simParticipants.sort((a,b)=>(b.simPts??-1)-(a.simPts??-1));
   const gainClass=pts=>pts===50?'gain-50':pts===30?'gain-30':pts===20?'gain-20':pts===10?'gain-10':'gain-0';
   const gainLabel=pts=>pts===50?'⭐⭐⭐⭐ +50':pts===30?'⭐⭐⭐ +30':pts===20?'⭐⭐ +20':pts===10?'⭐ +10':'✕ +0';
-  const realRes = realResults[matchId] || realResults[String(matchId)];
-  const matchesReal = realRes && String(realRes.gl)===String(gl) && String(realRes.gv)===String(gv);
-  const headerLabel = matchesReal
-    ? (realRes.final ? '✅ Resultado FINAL' : '🔴 Marcador EN VIVO')
-    : 'Simulado';
-  const headerHint = matchesReal ? 'Puntos según marcador actual' : 'Solo tú ves esto';
-  let html=`<div class="sim-results-header"><span class="sim-results-title">${headerLabel}: ${m?m.lf:''} ${gl} – ${gv} ${m?m.vf:''}</span><span class="sim-results-hint">${headerHint}</span></div>`;
+  let html=`<div class="sim-results-header">
+    <span class="sim-results-title">Simulado: ${m?m.lf:''} ${gl} – ${gv} ${m?m.vf:''}</span>
+    <span class="sim-results-hint">Solo tú ves esto</span>
+  </div>`;
   simParticipants.forEach((p,i)=>{
     const isMe=me&&p.name.toLowerCase()===me.toLowerCase();
     const av=AV_COLORS[i%AV_COLORS.length];
@@ -1890,7 +1679,7 @@ function buildMyPicks(editMode) {
     return `<div class="mypick-row">
       <div class="mypick-left">
         <div class="mypick-teams">${m.lf} ${m.local} vs ${m.visita} ${m.vf}</div>
-        <div class="mypick-meta">Grupo ${m.grp} · ${m.date} · ${m.time}${m.tv ? ' · ' + m.tv : ''}</div>
+        <div class="mypick-meta">Grupo ${m.grp} · ${m.date}</div>
       </div>
       <span class="mypick-score${has?'':' pending'}">${has?pk.gl+' – '+pk.gv:'pendiente'}</span>
     </div>`;
@@ -1908,7 +1697,6 @@ function toggleEditMode() {
   const sb=document.getElementById('submit-bar'),pw=document.getElementById('prog-wrap');
   if (editModeActive) {
     if (!document.getElementById('gl-1')){renderGames();prefill();refreshProgress();}
-    hasUnsavedChanges=false;
     gw.style.display='block';mw.style.display='none';sb.style.display='block';pw.style.display='block';
     setTimeout(()=>scrollToFirstMissing(),200);
   } else {
@@ -1926,7 +1714,9 @@ function scrollToFirstMissing() {
   }
 }
 
-// ── PWA ──
+// ═══════════════════════════════════════
+//  PWA — INSTALAR CON HERO BUTTON + SNOOZE 24H
+// ═══════════════════════════════════════
 (function injectManifest() {
   const manifest={name:"Quiniela Mundial 2026",short_name:"Mundial 2026",start_url:"./",display:"standalone",background_color:"#1A1A2E",theme_color:"#1A1A2E",orientation:"portrait",
     icons:[{src:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' fill='%231A1A2E'/%3E%3Ctext y='155' x='16' font-size='160'%3E%E2%9A%BD%3C/text%3E%3C/svg%3E",sizes:"192x192",type:"image/svg+xml"}]};
@@ -1978,6 +1768,7 @@ function installPWA() {
   else{toast('Abre el menú del navegador → "Agregar a pantalla de inicio"');}
 }
 
+// FIX 5: Snooze 24h en lugar de bloquear para siempre
 function dismissInstall() {
   document.getElementById('install-banner').classList.remove('show');
   localStorage.setItem('pwa_snoozed',String(Date.now()+24*60*60*1000));
@@ -1992,7 +1783,10 @@ window.addEventListener('load',()=>{
   }
 });
 
+let hasUnsavedChanges=false;
+let realResults = {}; // {matchId: {gl, gv}} resultados reales por partido
 window.addEventListener('beforeunload',e=>{if(hasUnsavedChanges){e.preventDefault();e.returnValue='';}});
+
 
 // ── TOAST ──
 function toast(msg) {
@@ -2005,7 +1799,6 @@ function toast(msg) {
 // ── INIT ──
 load();
 setTimeout(buildUpcoming, 150);
-
 </script>
 </body>
 </html>
