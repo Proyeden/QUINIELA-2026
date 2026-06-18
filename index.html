@@ -1342,11 +1342,14 @@ function buildUpcoming() {
         <span class="upcoming-expand-hint" onclick="toggleUpcomingPicks(${m.id})">${showPicksBtn}</span>
       </div>
       <div class="upcoming-picks-panel" id="upanel-${m.id}">${buildPicksPanel(m)}</div>
-      <div style="padding:4px 12px 6px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-        <span id="rp-toggle-${m.id}" style="font-size:10px;font-weight:700;color:var(--navy3);cursor:pointer" onclick="toggleReportPanel(${m.id})">⚽ Reportar marcador</span>
-        ${simBtnHtml}
+      <div style="padding:8px 12px;border-top:1px solid var(--border);display:flex;gap:8px">
+        <button onclick="toggleReportPanel(${m.id})" id="rp-toggle-${m.id}"
+          style="flex:1;padding:9px 12px;background:var(--navy3);color:#fff;border:none;border-radius:var(--radius-sm);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+          ⚽ Reportar marcador
+        </button>
+        <span style="display:flex;align-items:center">${simBtnHtml}</span>
       </div>
-      <div id="rpanel-${m.id}" style="display:none"></div>
+      <div id="rp-${m.id}" style="display:none;border-top:1px solid var(--border);background:#f8f9ff;padding:10px 12px"></div>
       <div class="simulator-card" id="sim-${m.id}" style="display:none">${buildSimulatorInner(m)}</div>
     </div>`;
   });
@@ -1512,64 +1515,89 @@ function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t
 
 function toggleReportPanel(matchId) {
   const panel = document.getElementById('rp-' + matchId);
-  const toggle = document.getElementById('rp-toggle-' + matchId);
+  const btn = document.getElementById('rp-toggle-' + matchId);
   if (!panel) return;
-  const isOpen = panel.classList.contains('open');
-  panel.classList.toggle('open', !isOpen);
-  if (toggle) toggle.textContent = isOpen ? '⚽ Reportar marcador ▼' : '⚽ Reportar marcador ▲';
-  if (!isOpen) renderReportPanel(matchId);
+  const isOpen = panel.style.display !== 'none' && panel.style.display !== '';
+  if (isOpen) {
+    panel.style.display = 'none';
+    if (btn) btn.textContent = '⚽ Reportar marcador';
+  } else {
+    panel.style.display = 'block';
+    if (btn) btn.textContent = '✕ Cerrar reporte';
+    renderReportPanel(matchId);
+  }
 }
 
 function renderReportPanel(matchId) {
   const panel = document.getElementById('rp-' + matchId);
   if (!panel) return;
 
-  const res = realResults[matchId] || realResults[String(matchId)];
-  if (res && res.final !== false) {
-    panel.innerHTML = '<div style="font-size:11px;color:var(--green);font-weight:600;padding:4px 0">✅ Resultado confirmado: ' + res.gl + ' – ' + res.gv + '</div>';
-    return;
-  }
-
-  const matchProposals = _proposals[String(matchId)] || {};
+  const mid = String(matchId);
+  const res = realResults[matchId] || realResults[mid];
   const m = MATCHES.find(x => x.id === matchId);
   if (!m) return;
 
-  // Votes display
+  // If already confirmed final, just show result
+  if (res && res.final === true) {
+    panel.innerHTML = '<div style="font-size:12px;color:var(--green);font-weight:700;padding:6px 0">✅ Resultado final: ' + res.gl + ' – ' + res.gv + '</div>';
+    return;
+  }
+
+  const props = _proposals[mid] || {};
+  const myName = me || '';
+
+  // Current votes display
   let votesHtml = '';
-  const entries = Object.entries(matchProposals).sort((a,b) => b[1].length - a[1].length);
+  const entries = Object.entries(props).sort((a,b) => b[1].length - a[1].length);
   if (entries.length) {
-    votesHtml = '<div class="report-votes">';
+    votesHtml = '<div style="margin-bottom:8px">';
     entries.forEach(([score, voters]) => {
-      const pct = Math.min(100, Math.round(voters.length / REPORT_VOTES_NEEDED * 100));
       const [gl, gv] = score.split('-');
-      votesHtml += '<div class="report-vote-row">'
-        + '<span class="report-vote-score">' + gl + ' – ' + gv + '</span>'
-        + '<span style="font-size:10px;color:var(--muted)">' + voters.slice(0,3).join(', ') + (voters.length>3?' +más':'') + '</span>'
-        + '<span style="font-size:11px;font-weight:700;color:' + (voters.length>=REPORT_VOTES_NEEDED?'var(--green)':'var(--muted)') + '">'
-        + voters.length + '/' + REPORT_VOTES_NEEDED + (voters.length>=REPORT_VOTES_NEEDED?' ✅':'') + '</span>'
+      const count = voters.length;
+      const pct = Math.min(100, Math.round(count / REPORT_VOTES_NEEDED * 100));
+      votesHtml += '<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid #eee;font-size:12px">'
+        + '<span style="font-weight:800;background:#e0f2fe;color:var(--navy);padding:2px 10px;border-radius:6px">' + gl + ' – ' + gv + '</span>'
+        + '<span style="color:var(--muted);font-size:11px">' + voters.slice(0,3).join(', ') + (voters.length>3 ? ' +' + (voters.length-3) : '') + '</span>'
+        + '<span style="font-weight:700;color:' + (count>=REPORT_VOTES_NEEDED?'var(--green)':'var(--muted)') + '">'
+        + count + '/' + REPORT_VOTES_NEEDED + (count>=REPORT_VOTES_NEEDED?' ✅':'') + '</span>'
         + '</div>';
     });
     votesHtml += '</div>';
   }
 
-  // Check if current user already voted
-  const myVote = Object.entries(matchProposals).find(([,voters]) => me && voters.includes(me));
+  // Check if user already voted
+  const myVoteEntry = Object.entries(props).find(([,voters]) => myName && voters.includes(myName));
 
-  const inputHtml = myVote
-    ? '<div style="font-size:11px;color:var(--green);font-weight:600">✅ Reportaste ' + myVote[0].replace('-',' – ') + ' · <span style="color:var(--red);cursor:pointer;text-decoration:underline" onclick="cancelReport(' + matchId + ')">Cancelar</span></div>'
-    : '<div class="report-input-row">'
-      + '<span style="font-size:11px;font-weight:600;color:var(--muted)">' + m.lf + '</span>'
-      + '<input class="report-score-box" type="number" id="r-gl-' + matchId + '" min="0" max="20" placeholder="0" inputmode="decimal">'
-      + '<span style="font-weight:800;color:var(--red)">–</span>'
-      + '<input class="report-score-box" type="number" id="r-gv-' + matchId + '" min="0" max="20" placeholder="0" inputmode="decimal">'
-      + '<span style="font-size:11px;font-weight:600;color:var(--muted)">' + m.vf + '</span>'
-      + '<button class="report-live-btn" onclick="submitReport(' + matchId + ',false)">🔴 En vivo</button>'
-      + '<button class="report-final-btn" onclick="submitReport(' + matchId + ',true)">✅ Final</button>'
+  let inputHtml = '';
+  if (myVoteEntry) {
+    const [sc] = myVoteEntry;
+    const [g1,g2] = sc.split('-');
+    inputHtml = '<div style="font-size:12px;color:var(--green);font-weight:600">'
+      + '✅ Reportaste ' + g1 + ' – ' + g2
+      + ' &nbsp;<span style="color:var(--red);cursor:pointer;text-decoration:underline;font-weight:700" onclick="cancelReport(' + matchId + ')">Cancelar</span></div>';
+  } else {
+    inputHtml = '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px">'
+      + '<span style="font-size:12px;font-weight:600;color:var(--muted)">' + m.lf + '</span>'
+      + '<input type="number" id="r-gl-' + matchId + '" min="0" max="20" placeholder="0" inputmode="decimal"'
+      + ' style="width:44px;height:38px;border:2px solid var(--border);border-radius:6px;font-size:18px;font-weight:700;text-align:center;font-family:inherit;-moz-appearance:textfield;appearance:textfield">'
+      + '<span style="font-size:16px;font-weight:800;color:var(--red)">–</span>'
+      + '<input type="number" id="r-gv-' + matchId + '" min="0" max="20" placeholder="0" inputmode="decimal"'
+      + ' style="width:44px;height:38px;border:2px solid var(--border);border-radius:6px;font-size:18px;font-weight:700;text-align:center;font-family:inherit;-moz-appearance:textfield;appearance:textfield">'
+      + '<span style="font-size:12px;font-weight:600;color:var(--muted)">' + m.vf + '</span>'
       + '</div>'
-      + '<div style="font-size:10px;color:var(--muted);margin-top:4px">Necesita ' + REPORT_VOTES_NEEDED + ' votos iguales para confirmarse automáticamente</div>';
+      + '<div style="display:flex;gap:6px">'
+      + '<button onclick="submitReport(' + matchId + ',false)" style="flex:1;padding:8px;background:var(--red);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🔴 En vivo</button>'
+      + '<button onclick="submitReport(' + matchId + ',true)" style="flex:1;padding:8px;background:var(--green);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✅ Final</button>'
+      + '</div>';
+    if (!myName) {
+      inputHtml += '<div style="font-size:10px;color:var(--muted);margin-top:4px">⚠️ Ingresa tu nombre en "Mi Quiniela" para poder reportar</div>';
+    }
+  }
 
-  panel.innerHTML = '<div class="report-info"><strong>¿Ves el partido?</strong> Ingresa el marcador. Con ' + REPORT_VOTES_NEEDED + ' reportes iguales se confirma para todos. El admin confirma con 1 voto.</div>'
-    + votesHtml + inputHtml;
+  const infoHtml = '<div style="font-size:10px;color:#5b7abf;background:#eef4ff;border:1px solid #c7d7ff;border-radius:6px;padding:6px 8px;margin-bottom:8px;line-height:1.6">'
+    + 'Necesita <strong>' + REPORT_VOTES_NEEDED + ' votos iguales</strong> para confirmarse. Admin confirma con 1 voto.</div>';
+
+  panel.innerHTML = infoHtml + votesHtml + inputHtml;
 }
 
 async function submitReport(matchId, isFinal) {
