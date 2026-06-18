@@ -772,6 +772,7 @@ function load() {
     if (activePage === 'page-ranking') buildRanking();
     if (activePage === 'page-admin') buildAdmin();
     buildUpcoming();
+    refreshOpenSimulators();
   }, err => console.warn('No se pudo leer configuración', err));
 
   // Snapshot separado para propuestas de marcadores (NO toca realResults)
@@ -855,21 +856,51 @@ document.getElementById('inp-name').addEventListener('keydown', e => { if (e.key
 
 function renderGames() {
   let html = '';
-  for (const grp of 'ABCDEFGHIJKL') {
-    const gd = G[grp];
-    html += `<div class="group-sep"><span class="group-chip" style="background:${gd.c};color:#fff">Grupo ${grp}</span><div class="sep-line"></div><span class="group-teams-txt">${gd.t}</span></div>`;
-    MATCHES.filter(m => m.grp === grp).forEach(m => {
-      html += `<div class="game-card" id="card-${m.id}" style="border-left:3px solid ${gd.c}">
-        <div class="game-top" style="background:${gd.c}"><span class="game-id">#${m.id}</span><span class="game-date">${m.date}</span></div>
+  // Sort matches chronologically by date then time
+  const sorted = [...MATCHES].sort((a, b) => {
+    const da = DATE_MAP[a.date], db = DATE_MAP[b.date];
+    if (da - db !== 0) return da - db;
+    const ta = (a.time || '00:00').split(':').map(Number);
+    const tb = (b.time || '00:00').split(':').map(Number);
+    return (ta[0]*60+ta[1]) - (tb[0]*60+tb[1]);
+  });
+
+  let lastDate = null;
+  sorted.forEach(m => {
+    const gd = G[m.grp];
+    // Date separator when date changes
+    if (m.date !== lastDate) {
+      lastDate = m.date;
+      const d = DATE_MAP[m.date];
+      const dayName = d ? d.toLocaleDateString('es-GT', {weekday:'long', day:'numeric', month:'long'}) : m.date;
+      html += `<div class="group-sep">
+        <span class="group-chip" style="background:#1A1A2E;color:#F5A623">${dayName}</span>
+        <div class="sep-line"></div>
+      </div>`;
+    }
+    html += `
+      <div class="game-card" id="card-${m.id}" style="border-left:3px solid ${gd.c}">
+        <div class="game-top" style="background:${gd.c}">
+          <span class="game-id">#${m.id} · Grupo ${m.grp}${m.time ? ' · ' + m.time : ''}</span>
+          <span class="game-date">${m.tv || ''}</span>
+        </div>
         <div class="game-body">
-          <div class="team-name r"><span class="team-flag">${m.lf}</span>${m.local}</div>
-          <input class="score-box" type="number" id="gl-${m.id}" min="0" max="20" placeholder="–" inputmode="decimal" pattern="[0-9]*" oninput="onScore(${m.id})">
+          <div class="team-name r">
+            <span class="team-flag">${m.lf}</span>${m.local}
+          </div>
+          <input class="score-box" type="number" id="gl-${m.id}" min="0" max="20" placeholder="–"
+            inputmode="decimal" pattern="[0-9]*"
+            oninput="onScore(${m.id})">
           <span class="vs-dash">–</span>
-          <input class="score-box" type="number" id="gv-${m.id}" min="0" max="20" placeholder="–" inputmode="decimal" pattern="[0-9]*" oninput="onScore(${m.id})">
-          <div class="team-name"><span class="team-flag">${m.vf}</span>${m.visita}</div>
-        </div></div>`;
-    });
-  }
+          <input class="score-box" type="number" id="gv-${m.id}" min="0" max="20" placeholder="–"
+            inputmode="decimal" pattern="[0-9]*"
+            oninput="onScore(${m.id})">
+          <div class="team-name">
+            <span class="team-flag">${m.vf}</span>${m.visita}
+          </div>
+        </div>
+      </div>`;
+  });
   document.getElementById('games-list').innerHTML = html;
 }
 
@@ -1395,7 +1426,16 @@ function buildSimulatorInner(m) {
 function toggleSimulator(matchId) {
   const card=document.getElementById('sim-'+matchId);const chev=document.getElementById('simchev-'+matchId);if(!card) return;
   const isOpen=card.style.display!=='none';card.style.display=isOpen?'none':'block';
-  if(!isOpen){const m=MATCHES.find(x=>x.id===matchId);if(m) card.innerHTML=buildSimulatorInner(m);}
+  if(!isOpen){
+    const m=MATCHES.find(x=>x.id===matchId);if(m) card.innerHTML=buildSimulatorInner(m);
+    // Pre-fill with real/live score if available
+    const res=realResults[matchId]||realResults[String(matchId)];
+    if(res){
+      const gl=document.getElementById('simgl-'+matchId);
+      const gv=document.getElementById('simgv-'+matchId);
+      if(gl&&gv){gl.value=res.gl;gv.value=res.gv;runSimulation(matchId);}
+    }
+  }
   if(chev) chev.classList.toggle('open',!isOpen);
 }
 
@@ -1415,7 +1455,12 @@ function runSimulation(matchId) {
   sims.sort((a,b)=>(b.simPts??-1)-(a.simPts??-1));
   const gc=pts=>pts===50?'gain-50':pts===30?'gain-30':pts===20?'gain-20':pts===10?'gain-10':'gain-0';
   const gl2=pts=>pts===50?'⭐⭐⭐⭐ +50':pts===30?'⭐⭐⭐ +30':pts===20?'⭐⭐ +20':pts===10?'⭐ +10':'✕ +0';
-  let html=`<div class="sim-results-header"><span class="sim-results-title">Simulado: ${m?m.lf:''} ${gl} – ${gv} ${m?m.vf:''}</span><span class="sim-results-hint">Solo tú ves esto</span></div>`;
+  const realRes2=realResults[matchId]||realResults[String(matchId)];
+  const isLive=realRes2&&String(realRes2.gl)===String(gl)&&String(realRes2.gv)===String(gv)&&realRes2.final===false;
+  const isFinalRes=realRes2&&String(realRes2.gl)===String(gl)&&String(realRes2.gv)===String(gv)&&realRes2.final!==false;
+  const simLabel=isFinalRes?'✅ FINAL':isLive?'🔴 EN VIVO':'🧮 Simulado';
+  const simHint=isFinalRes?'Puntos confirmados':isLive?'Puntos en tiempo real':'Solo tú ves esto';
+  let html=`<div class="sim-results-header"><span class="sim-results-title">${simLabel}: ${m?m.lf:''} ${gl} – ${gv} ${m?m.vf:''}</span><span class="sim-results-hint">${simHint}</span></div>`;
   sims.forEach((p,i)=>{
     const isMe=me&&p.name.toLowerCase()===me.toLowerCase();
     const av=AV_COLORS[i%AV_COLORS.length];const ini=p.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
@@ -1622,6 +1667,30 @@ async function applyReport(matchId, gl, gv, isFinal) {
   }
   toast(isFinal ? `✅ Resultado confirmado: ${gl} – ${gv}` : `🔴 En vivo: ${gl} – ${gv}`);
   openReport(matchId); // close panel
+}
+
+
+// ── ACTUALIZAR SIMULADORES ABIERTOS ─────────────────
+// Se llama cada vez que llegan resultados nuevos de Firebase
+function refreshOpenSimulators() {
+  MATCHES.forEach(m => {
+    const card = document.getElementById('sim-' + m.id);
+    if (!card || card.style.display === 'none') return; // simulador cerrado
+
+    const res = realResults[m.id] || realResults[String(m.id)];
+    if (!res) return; // sin marcador real aún
+
+    // Pre-fill inputs with real score
+    const glInput = document.getElementById('simgl-' + m.id);
+    const gvInput = document.getElementById('simgv-' + m.id);
+    if (glInput && gvInput) {
+      if (glInput.value !== String(res.gl) || gvInput.value !== String(res.gv)) {
+        glInput.value = res.gl;
+        gvInput.value = res.gv;
+      }
+      runSimulation(m.id); // recalculate with current score
+    }
+  });
 }
 
 // ── INIT ──
