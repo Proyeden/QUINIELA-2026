@@ -1343,7 +1343,7 @@ function buildUpcoming() {
       </div>
       <div class="upcoming-picks-panel" id="upanel-${m.id}">${buildPicksPanel(m)}</div>
       <div style="padding:8px 12px;border-top:1px solid var(--border);display:flex;gap:8px">
-        <button onclick="toggleReportPanel(${m.id})" id="rp-toggle-${m.id}"
+        <button onclick="openReport(${m.id})" id="rpbtn-${m.id}"
           style="flex:1;padding:9px 12px;background:var(--navy3);color:#fff;border:none;border-radius:var(--radius-sm);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
           ⚽ Reportar marcador
         </button>
@@ -1507,172 +1507,121 @@ window.addEventListener('beforeunload',e=>{if(hasUnsavedChanges){e.preventDefaul
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._tid);t._tid=setTimeout(()=>t.classList.remove('show'),3200);}
 
 
-// ══════════════════════════════════════════════════
-//  SISTEMA DE REPORTE COLECTIVO DE MARCADORES
-//  3 votos iguales = confirmación automática
-//  Admin = 1 voto confirma inmediatamente
-// ══════════════════════════════════════════════════
+// ── SISTEMA DE REPORTE ──────────────────────────────
+const VOTES_NEEDED = 3;
 
-function toggleReportPanel(matchId) {
+function openReport(matchId) {
   const panel = document.getElementById('rp-' + matchId);
-  const btn = document.getElementById('rp-toggle-' + matchId);
-  if (!panel) return;
-  const isOpen = panel.style.display !== 'none' && panel.style.display !== '';
+  const btn   = document.getElementById('rpbtn-' + matchId);
+  if (!panel) { toast('Error: panel no encontrado'); return; }
+
+  const isOpen = panel.style.display === 'block';
   if (isOpen) {
     panel.style.display = 'none';
     if (btn) btn.textContent = '⚽ Reportar marcador';
-  } else {
-    panel.style.display = 'block';
-    if (btn) btn.textContent = '✕ Cerrar reporte';
-    renderReportPanel(matchId);
-  }
-}
-
-function renderReportPanel(matchId) {
-  const panel = document.getElementById('rp-' + matchId);
-  if (!panel) return;
-
-  const mid = String(matchId);
-  const res = realResults[matchId] || realResults[mid];
-  const m = MATCHES.find(x => x.id === matchId);
-  if (!m) return;
-
-  // If already confirmed final, just show result
-  if (res && res.final === true) {
-    panel.innerHTML = '<div style="font-size:12px;color:var(--green);font-weight:700;padding:6px 0">✅ Resultado final: ' + res.gl + ' – ' + res.gv + '</div>';
     return;
   }
 
-  const props = _proposals[mid] || {};
-  const myName = me || '';
+  panel.style.display = 'block';
+  if (btn) btn.textContent = '✕ Cerrar';
 
-  // Current votes display
-  let votesHtml = '';
-  const entries = Object.entries(props).sort((a,b) => b[1].length - a[1].length);
-  if (entries.length) {
-    votesHtml = '<div style="margin-bottom:8px">';
-    entries.forEach(([score, voters]) => {
-      const [gl, gv] = score.split('-');
-      const count = voters.length;
-      const pct = Math.min(100, Math.round(count / REPORT_VOTES_NEEDED * 100));
-      votesHtml += '<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid #eee;font-size:12px">'
-        + '<span style="font-weight:800;background:#e0f2fe;color:var(--navy);padding:2px 10px;border-radius:6px">' + gl + ' – ' + gv + '</span>'
-        + '<span style="color:var(--muted);font-size:11px">' + voters.slice(0,3).join(', ') + (voters.length>3 ? ' +' + (voters.length-3) : '') + '</span>'
-        + '<span style="font-weight:700;color:' + (count>=REPORT_VOTES_NEEDED?'var(--green)':'var(--muted)') + '">'
-        + count + '/' + REPORT_VOTES_NEEDED + (count>=REPORT_VOTES_NEEDED?' ✅':'') + '</span>'
-        + '</div>';
-    });
-    votesHtml += '</div>';
-  }
+  const mid = String(matchId);
+  const m   = MATCHES.find(x => x.id === matchId);
+  const res = realResults[mid] || realResults[matchId];
+  const props = (_proposals && _proposals[mid]) ? _proposals[mid] : {};
 
-  // Check if user already voted
-  const myVoteEntry = Object.entries(props).find(([,voters]) => myName && voters.includes(myName));
-
-  let inputHtml = '';
-  if (myVoteEntry) {
-    const [sc] = myVoteEntry;
-    const [g1,g2] = sc.split('-');
-    inputHtml = '<div style="font-size:12px;color:var(--green);font-weight:600">'
-      + '✅ Reportaste ' + g1 + ' – ' + g2
-      + ' &nbsp;<span style="color:var(--red);cursor:pointer;text-decoration:underline;font-weight:700" onclick="cancelReport(' + matchId + ')">Cancelar</span></div>';
-  } else {
-    inputHtml = '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px">'
-      + '<span style="font-size:12px;font-weight:600;color:var(--muted)">' + m.lf + '</span>'
-      + '<input type="number" id="r-gl-' + matchId + '" min="0" max="20" placeholder="0" inputmode="decimal"'
-      + ' style="width:44px;height:38px;border:2px solid var(--border);border-radius:6px;font-size:18px;font-weight:700;text-align:center;font-family:inherit;-moz-appearance:textfield;appearance:textfield">'
-      + '<span style="font-size:16px;font-weight:800;color:var(--red)">–</span>'
-      + '<input type="number" id="r-gv-' + matchId + '" min="0" max="20" placeholder="0" inputmode="decimal"'
-      + ' style="width:44px;height:38px;border:2px solid var(--border);border-radius:6px;font-size:18px;font-weight:700;text-align:center;font-family:inherit;-moz-appearance:textfield;appearance:textfield">'
-      + '<span style="font-size:12px;font-weight:600;color:var(--muted)">' + m.vf + '</span>'
-      + '</div>'
-      + '<div style="display:flex;gap:6px">'
-      + '<button onclick="submitReport(' + matchId + ',false)" style="flex:1;padding:8px;background:var(--red);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🔴 En vivo</button>'
-      + '<button onclick="submitReport(' + matchId + ',true)" style="flex:1;padding:8px;background:var(--green);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✅ Final</button>'
-      + '</div>';
-    if (!myName) {
-      inputHtml += '<div style="font-size:10px;color:var(--muted);margin-top:4px">⚠️ Ingresa tu nombre en "Mi Quiniela" para poder reportar</div>';
-    }
-  }
-
-  const infoHtml = '<div style="font-size:10px;color:#5b7abf;background:#eef4ff;border:1px solid #c7d7ff;border-radius:6px;padding:6px 8px;margin-bottom:8px;line-height:1.6">'
-    + 'Necesita <strong>' + REPORT_VOTES_NEEDED + ' votos iguales</strong> para confirmarse. Admin confirma con 1 voto.</div>';
-
-  panel.innerHTML = infoHtml + votesHtml + inputHtml;
-}
-
-async function submitReport(matchId, isFinal) {
-  if (!me) {
-    const n = prompt('Tu nombre (para registrar el reporte):');
-    if (!n || !n.trim()) return;
-    me = n.trim();
-  }
-  const gl = document.getElementById('r-gl-' + matchId)?.value;
-  const gv = document.getElementById('r-gv-' + matchId)?.value;
-  if (gl === '' || gl === undefined || gv === '' || gv === undefined) {
-    return toast('Ingresa el marcador completo');
-  }
-
-  const scoreKey = gl + '-' + gv;
-  if (!_proposals[String(matchId)]) _proposals[String(matchId)] = {};
-
-  // Remove previous vote by same user
-  Object.keys(_proposals[String(matchId)]).forEach(k => {
-    _proposals[String(matchId)][k] = _proposals[String(matchId)][k].filter(n => n !== me);
-    if (!_proposals[String(matchId)][k].length) delete _proposals[String(matchId)][k];
+  // Build votes summary
+  let vHtml = '';
+  Object.entries(props).sort((a,b)=>b[1].length-a[1].length).forEach(([score, voters]) => {
+    const [gl,gv] = score.split('-');
+    const n = voters.length;
+    vHtml += `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #eee;font-size:12px">
+      <b style="background:#dbeafe;padding:2px 10px;border-radius:6px">${gl} – ${gv}</b>
+      <span style="color:#777;font-size:11px">${voters.slice(0,2).join(', ')}${n>2?` +${n-2}`:''}</span>
+      <span style="font-weight:700;color:${n>=VOTES_NEEDED?'#27AE60':'#aaa'}">${n}/${VOTES_NEEDED}${n>=VOTES_NEEDED?' ✅':''}</span>
+    </div>`;
   });
 
-  // Add new vote
-  if (!_proposals[String(matchId)][scoreKey]) _proposals[String(matchId)][scoreKey] = [];
-  _proposals[String(matchId)][scoreKey].push(me);
+  // Build input
+  const iHtml = `
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0">
+      <span style="font-size:13px">${m ? m.lf : ''}</span>
+      <input type="number" id="rgl-${mid}" min="0" max="20" placeholder="0" inputmode="decimal"
+        style="width:46px;height:40px;border:2px solid #ccc;border-radius:8px;font-size:20px;font-weight:700;text-align:center;font-family:inherit">
+      <span style="font-weight:800;color:#E94560;font-size:18px">–</span>
+      <input type="number" id="rgv-${mid}" min="0" max="20" placeholder="0" inputmode="decimal"
+        style="width:46px;height:40px;border:2px solid #ccc;border-radius:8px;font-size:20px;font-weight:700;text-align:center;font-family:inherit">
+      <span style="font-size:13px">${m ? m.vf : ''}</span>
+    </div>
+    <div style="display:flex;gap:6px">
+      <button onclick="sendReport(${matchId},false)"
+        style="flex:1;padding:9px;background:#E94560;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+        🔴 En vivo
+      </button>
+      <button onclick="sendReport(${matchId},true)"
+        style="flex:1;padding:9px;background:#27AE60;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+        ✅ Final
+      </button>
+    </div>`;
 
-  // Save proposals to Firebase
+  const note = `<div style="font-size:10px;color:#5b7abf;background:#eef4ff;border:1px solid #c7d7ff;border-radius:6px;padding:6px 8px;margin-bottom:6px">
+    ${VOTES_NEEDED} votos iguales confirman automáticamente · Admin confirma con 1 voto</div>`;
+
+  panel.innerHTML = note + (vHtml ? `<div style="margin-bottom:8px">${vHtml}</div>` : '') + iHtml;
+}
+
+async function sendReport(matchId, isFinal) {
+  const mid = String(matchId);
+  const gl  = document.getElementById('rgl-' + mid)?.value ?? '';
+  const gv  = document.getElementById('rgv-' + mid)?.value ?? '';
+  if (gl === '' || gv === '') return toast('Ingresa el marcador completo');
+
+  const reporter = me || prompt('Tu nombre (para registrar el reporte):');
+  if (!reporter || !reporter.trim()) return;
+  if (!me) me = reporter.trim();
+
+  const key = gl + '-' + gv;
+  if (!_proposals) _proposals = {};
+  if (!_proposals[mid]) _proposals[mid] = {};
+
+  // Remove previous vote by same person
+  Object.keys(_proposals[mid]).forEach(k => {
+    _proposals[mid][k] = (_proposals[mid][k] || []).filter(n => n !== me);
+    if (!_proposals[mid][k].length) delete _proposals[mid][k];
+  });
+  if (!_proposals[mid][key]) _proposals[mid][key] = [];
+  _proposals[mid][key].push(me);
+
   if (db) {
     try {
-      await db.collection(SETTINGS_COLLECTION).doc(SETTINGS_DOC).set(
-        { proposals: _proposals, updatedAt: Date.now() }, { merge: true }
-      );
-    } catch(e) { console.error('Error saving proposal:', e); }
+      await db.collection(SETTINGS_COLLECTION).doc(SETTINGS_DOC)
+        .set({ proposals: _proposals }, { merge: true });
+    } catch(e) { console.error(e); }
   }
 
   toast('✅ Marcador reportado');
 
-  // Check if threshold reached or admin
-  const voters = _proposals[String(matchId)][scoreKey];
-  if (voters.length >= REPORT_VOTES_NEEDED || isAdmin) {
-    await confirmReport(matchId, gl, gv, isFinal);
+  const votes = _proposals[mid][key].length;
+  if (votes >= VOTES_NEEDED || isAdmin) {
+    await applyReport(matchId, gl, gv, isFinal);
   } else {
-    renderReportPanel(matchId);
+    toast(`Reporte enviado (${votes}/${VOTES_NEEDED} votos)`);
+    openReport(matchId); // refresh panel
   }
 }
 
-async function cancelReport(matchId) {
-  if (!_proposals[String(matchId)]) return;
-  Object.keys(_proposals[String(matchId)]).forEach(k => {
-    _proposals[String(matchId)][k] = _proposals[String(matchId)][k].filter(n => n !== me);
-    if (!_proposals[String(matchId)][k].length) delete _proposals[String(matchId)][k];
-  });
+async function applyReport(matchId, gl, gv, isFinal) {
+  const mid = String(matchId);
+  const newRes = Object.assign({}, realResults);
+  newRes[mid] = { gl: String(gl), gv: String(gv), final: isFinal === true };
   if (db) {
     try {
-      await db.collection(SETTINGS_COLLECTION).doc(SETTINGS_DOC).set(
-        { proposals: _proposals, updatedAt: Date.now() }, { merge: true }
-      );
+      await db.collection(SETTINGS_COLLECTION).doc(SETTINGS_DOC)
+        .set({ realResults: newRes }, { merge: true });
     } catch(e) { console.error(e); }
   }
-  renderReportPanel(matchId);
-}
-
-async function confirmReport(matchId, gl, gv, isFinal) {
-  const newResults = Object.assign({}, realResults);
-  newResults[String(matchId)] = { gl: String(gl), gv: String(gv), final: isFinal === true };
-  if (db) {
-    try {
-      await db.collection(SETTINGS_COLLECTION).doc(SETTINGS_DOC).set(
-        { realResults: newResults, updatedAt: Date.now() }, { merge: true }
-      );
-    } catch(e) { console.error(e); }
-  }
-  toast(isFinal ? '✅ Resultado final confirmado: ' + gl + ' – ' + gv : '🔴 Marcador en vivo: ' + gl + ' – ' + gv);
-  renderReportPanel(matchId);
+  toast(isFinal ? `✅ Resultado confirmado: ${gl} – ${gv}` : `🔴 En vivo: ${gl} – ${gv}`);
+  openReport(matchId); // close panel
 }
 
 // ── INIT ──
