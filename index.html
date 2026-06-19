@@ -1373,13 +1373,24 @@ function buildUpcoming() {
         <span class="upcoming-expand-hint" onclick="toggleUpcomingPicks(${m.id})">${showPicksBtn}</span>
       </div>
       <div class="upcoming-picks-panel" id="upanel-${m.id}">${buildPicksPanel(m)}</div>
-      <div style="padding:8px 12px;border-top:1px solid var(--border);display:flex;gap:8px">
-        <button onclick="openReport(${m.id})" id="rpbtn-${m.id}"
-          style="flex:1;padding:9px 12px;background:var(--navy3);color:#fff;border:none;border-radius:var(--radius-sm);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
-          📺 ¿Cómo va?
-        </button>
-        <span style="display:flex;align-items:center">${simBtnHtml}</span>
-      </div>
+      ${(()=>{
+        // Show "¿Cómo va?" only when match is live (started, no confirmed final)
+        const res=realResults[m.id]||realResults[String(m.id)];
+        const isFinal=res&&res.final===true;
+        if(isFinal) return `<div style="padding:8px 12px;border-top:1px solid var(--border);display:flex;justify-content:flex-end">${simBtnHtml}</div>`;
+        const [hh,mm]=(m.time||'00:00').split(':').map(Number);
+        const matchStart=new Date(DATE_MAP[m.date]);
+        matchStart.setHours(hh,mm,0,0);
+        const isLive=now>=new Date(matchStart.getTime()-10*60*1000);
+        if(!isLive) return `<div style="padding:8px 12px;border-top:1px solid var(--border);display:flex;justify-content:flex-end">${simBtnHtml}</div>`;
+        return `<div style="padding:8px 12px;border-top:1px solid var(--border);display:flex;gap:8px">
+          <button onclick="openReport(${m.id})" id="rpbtn-${m.id}"
+            style="flex:1;padding:9px 12px;background:var(--navy3);color:#fff;border:none;border-radius:var(--radius-sm);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+            📺 ¿Cómo va?
+          </button>
+          <span style="display:flex;align-items:center">${simBtnHtml}</span>
+        </div>`;
+      })()}
       <div id="rp-${m.id}" style="display:none;border-top:1px solid var(--border);background:#f8f9ff;padding:10px 12px"></div>
       <div class="simulator-card" id="sim-${m.id}" style="display:none">${buildSimulatorInner(m)}</div>
     </div>`;
