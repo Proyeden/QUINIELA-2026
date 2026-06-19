@@ -1376,7 +1376,7 @@ function buildUpcoming() {
       ${(()=>{
         // Show "¿Cómo va?" only when match is live (started, no confirmed final)
         const res=realResults[m.id]||realResults[String(m.id)];
-        const isFinal=res&&res.final===true;
+        const isFinal=res&&res.final!==false; // undefined (admin) or true = confirmed
         if(isFinal) return `<div style="padding:8px 12px;border-top:1px solid var(--border);display:flex;justify-content:flex-end">${simBtnHtml}</div>`;
         const [hh,mm]=(m.time||'00:00').split(':').map(Number);
         const matchStart=new Date(DATE_MAP[m.date]);
