@@ -599,8 +599,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--light);color:var(--text);
 
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
-<script>
-// ═══════════════════════════════════════════════════
+<script>// ═══════════════════════════════════════════════════
 //  DATOS OFICIALES FIFA — 72 partidos, grupos A–L
 // ═══════════════════════════════════════════════════
 const G = {
@@ -1342,7 +1341,8 @@ function buildUpcoming() {
   const now=new Date();
   const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
   const limit=new Date(today); limit.setDate(today.getDate()+2);
-  const upcoming=MATCHES.filter(m=>{const d=DATE_MAP[m.date];if(!d)return false;const md=new Date(d.getFullYear(),d.getMonth(),d.getDate());return md>=today&&md<limit;});
+  const upcoming=MATCHES.filter(m=>{const d=DATE_MAP[m.date];if(!d)return false;const md=new Date(d.getFullYear(),d.getMonth(),d.getDate());return md>=today&&md<limit;})
+  .sort((a,b)=>{const da=DATE_MAP[a.date],db2=DATE_MAP[b.date];if(da-db2!==0)return da-db2;const ta=(a.time||'00:00').split(':').map(Number),tb=(b.time||'00:00').split(':').map(Number);return(ta[0]*60+ta[1])-(tb[0]*60+tb[1]);});
   if(!upcoming.length){
     const future=MATCHES.filter(m=>{const d=DATE_MAP[m.date];return d&&new Date(d.getFullYear(),d.getMonth(),d.getDate())>=today;});
     if(!future.length){wrap.innerHTML='';return;}
@@ -1376,7 +1376,7 @@ function buildUpcoming() {
       <div style="padding:8px 12px;border-top:1px solid var(--border);display:flex;gap:8px">
         <button onclick="openReport(${m.id})" id="rpbtn-${m.id}"
           style="flex:1;padding:9px 12px;background:var(--navy3);color:#fff;border:none;border-radius:var(--radius-sm);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
-          ⚽ Reportar marcador
+          📺 ¿Cómo va?
         </button>
         <span style="display:flex;align-items:center">${simBtnHtml}</span>
       </div>
@@ -1563,7 +1563,7 @@ function openReport(matchId) {
   const isOpen = panel.style.display === 'block';
   if (isOpen) {
     panel.style.display = 'none';
-    if (btn) btn.textContent = '⚽ Reportar marcador';
+    if (btn) btn.textContent = '📺 ¿Cómo va?';
     return;
   }
 
@@ -1615,15 +1615,23 @@ function openReport(matchId) {
   panel.innerHTML = note + (vHtml ? `<div style="margin-bottom:8px">${vHtml}</div>` : '') + iHtml;
 }
 
+
+
+
+
+
+
 async function sendReport(matchId, isFinal) {
   const mid = String(matchId);
   const gl  = document.getElementById('rgl-' + mid)?.value ?? '';
   const gv  = document.getElementById('rgv-' + mid)?.value ?? '';
   if (gl === '' || gv === '') return toast('Ingresa el marcador completo');
 
-  const reporter = me || prompt('Tu nombre (para registrar el reporte):');
-  if (!reporter || !reporter.trim()) return;
-  if (!me) me = reporter.trim();
+  if (!me) {
+    const n = prompt('Tu nombre (para registrar):');
+    if (!n || !n.trim()) return;
+    me = n.trim();
+  }
 
   const key = gl + '-' + gv;
   if (!_proposals) _proposals = {};
@@ -1644,31 +1652,32 @@ async function sendReport(matchId, isFinal) {
     } catch(e) { console.error(e); }
   }
 
-  toast('✅ Marcador reportado');
-
   const votes = _proposals[mid][key].length;
   if (votes >= VOTES_NEEDED || isAdmin) {
     await applyReport(matchId, gl, gv, isFinal);
   } else {
-    toast(`Reporte enviado (${votes}/${VOTES_NEEDED} votos)`);
-    openReport(matchId); // refresh panel
+    toast(`Reporte enviado (${votes}/${VOTES_NEEDED} votos necesarios)`);
+    openReport(matchId);
   }
 }
 
 async function applyReport(matchId, gl, gv, isFinal) {
   const mid = String(matchId);
-  const newRes = Object.assign({}, realResults);
-  newRes[mid] = { gl: String(gl), gv: String(gv), final: isFinal === true };
+  // Update local realResults immediately — no waiting for Firebase
+  realResults[mid] = { gl: String(gl), gv: String(gv), final: isFinal === true };
+  // Refresh UI right away
+  buildUpcoming();
+  refreshOpenSimulators();
+  buildRanking();
+  // Save to Firebase
   if (db) {
     try {
       await db.collection(SETTINGS_COLLECTION).doc(SETTINGS_DOC)
-        .set({ realResults: newRes }, { merge: true });
-    } catch(e) { console.error(e); }
+        .set({ realResults: Object.assign({}, realResults) }, { merge: true });
+    } catch(e) { console.error(e); toast('Error guardando en Firebase'); }
   }
-  toast(isFinal ? `✅ Resultado confirmado: ${gl} – ${gv}` : `🔴 En vivo: ${gl} – ${gv}`);
-  openReport(matchId); // close panel
+  toast(isFinal ? `✅ Final: ${gl} – ${gv}` : `🔴 En vivo: ${gl} – ${gv}`);
 }
-
 
 // ── ACTUALIZAR SIMULADORES ABIERTOS ─────────────────
 // Se llama cada vez que llegan resultados nuevos de Firebase
