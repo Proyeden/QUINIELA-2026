@@ -1493,7 +1493,7 @@ function buildMyPicks(em) {
   const pb=pending>0?`<div class="mypicks-pending">⚠️ Te faltan <strong>${pending}</strong> partido${pending===1?'':'s'} por pronosticar</div>`:`<div class="mypicks-pending" style="background:#d1fae5;border-color:#6ee7b7;color:#065f46">✅ Todos los 72 partidos pronosticados</div>`;
   const rows=MATCHES.map(m=>{const pk=picks.find(x=>x.id===m.id)||{};const has=pk.gl!==''&&pk.gv!==''&&pk.gl!=null;
     return `<div class="mypick-row"><div class="mypick-left"><div class="mypick-teams">${m.lf} ${m.local} vs ${m.visita} ${m.vf}</div><div class="mypick-meta">Grupo ${m.grp} · ${m.date}</div></div><span class="mypick-score${has?'':' pending'}">${has?pk.gl+' – '+pk.gv:'pendiente'}</span></div>`;}).join('');
-  wrap.innerHTML=`<div class="mypicks-card"><div class="mypicks-header"><div><div class="mypicks-title">Mis pronósticos — ${ex.name}</div><div class="mypicks-sub">${filled}/72</div></div><button class="mypicks-edit-btn" onclick="toggleEditMode()">✏️ Editar</button></div>${pb}${rows}</div>`;
+  wrap.innerHTML=`<div class="mypicks-card"><div class="mypicks-header"><div><div class="mypicks-title">Mis pronósticos — ${ex.name}</div><div class="mypicks-sub">${filled}/72</div></div></div>${pb}${rows}</div>`;
 }
 
 function toggleEditMode() {
@@ -1663,11 +1663,17 @@ async function sendReport(matchId, isFinal) {
     } catch(e) { console.error(e); }
   }
 
+  // Live score: apply immediately (no votes needed)
+  // Final score: needs VOTES_NEEDED votes or admin
+  if (!isFinal) {
+    await applyReport(matchId, gl, gv, false);
+    return;
+  }
   const votes = _proposals[mid][key].length;
   if (votes >= VOTES_NEEDED || isAdmin) {
-    await applyReport(matchId, gl, gv, isFinal);
+    await applyReport(matchId, gl, gv, true);
   } else {
-    toast(`Reporte enviado (${votes}/${VOTES_NEEDED} votos necesarios)`);
+    toast(`Reporte enviado (${votes}/${VOTES_NEEDED} votos para confirmar)`);
     openReport(matchId);
   }
 }
