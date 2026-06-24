@@ -1052,7 +1052,7 @@ async function saveResultados() {
     const gl = document.getElementById('rgl-'+m.id)?.value;
     const gv = document.getElementById('rgv-'+m.id)?.value;
     if (gl !== '' && gl !== undefined && gv !== '' && gv !== undefined) {
-      results[m.id] = { gl, gv };
+      results[m.id] = { gl, gv, final: true }; // admin = siempre final
     }
   });
   const count = Object.keys(results).length;
@@ -1060,6 +1060,10 @@ async function saveResultados() {
   const btn = document.querySelector('.res-save-btn');
   if (btn) { btn.textContent = 'Guardando…'; btn.disabled = true; }
   try {
+    // Actualizar local inmediatamente — el botón ¿Cómo va? desaparece al instante
+    realResults = Object.assign({}, realResults, results);
+    buildUpcoming();
+    buildRanking();
     await db.collection(SETTINGS_COLLECTION).doc(SETTINGS_DOC).set({ realResults: results, updatedAt: Date.now() }, { merge: true });
     if (btn) {
       btn.classList.add('saved'); btn.textContent = `✅ ${count} resultados guardados`;
